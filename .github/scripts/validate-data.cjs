@@ -62,6 +62,18 @@ for (const id of Object.keys(window.SUBJECT_DATA)) {
             fail(`mock ${m.id} composition: ${counts.mcq} MCQ + ${counts.short} SA + ${counts.long} LA (expected 20+10+2)`);
         }
     }
+
+    // Validate practiceTopics (subjects using the generator)
+    if (Array.isArray(s.practiceTopics)) {
+        for (const t of s.practiceTopics) {
+            if (!t.id || !t.name || !Array.isArray(t.sourceTopics)) {
+                fail(`practice topic missing fields: ${JSON.stringify(t).slice(0,80)}`);
+            }
+            for (const st of t.sourceTopics || []) {
+                if (!topicIds.has(st)) fail(`practice topic ${t.id} references unknown sourceTopic '${st}'`);
+            }
+        }
+    }
 }
 
 if (problems) {

@@ -1630,52 +1630,23 @@ window.SUBJECT_DATA.maths = {
     ],
 
     /* =========================================================
-       PRACTICE EXAMS — 20 themed exams covering the 13 outcomes.
-       Each lists question IDs from the bank above, mixing MCQ
-       and longer-form. Quiz engine handles 'exam-<id>' mode.
+       PRACTICE QUESTIONS — organised into 10 topic groups, each
+       with 10 exam sets of 20 questions. Generated at boot from
+       `practiceTopics` below.
        ========================================================= */
-    practiceExams: [
-        { id: "exam-1",  name: "Indices warmup",                 focus: "MA5-IND-C-01",
-          questionIds: ["m-mcq-1","m-mcq-2","m-mcq-3","m-mcq-4","m-mcq-5","m-mcq-6","m-mcq-7","m-mcq-8","m-sa-1"] },
-        { id: "exam-2",  name: "Negative & algebraic indices",    focus: "MA5-IND-P-01",
-          questionIds: ["m-mcq-9","m-mcq-10","m-mcq-11","m-mcq-12","m-mcq-13","m-mcq-14","m-mcq-15","m-mcq-1","m-mcq-3"] },
-        { id: "exam-3",  name: "Surds — simplification",          focus: "MA5-IND-P-02",
-          questionIds: ["m-mcq-16","m-mcq-17","m-mcq-18","m-mcq-19","m-mcq-24","m-mcq-25","m-sa-2"] },
-        { id: "exam-4",  name: "Surds & fractional indices",      focus: "MA5-IND-P-02",
-          questionIds: ["m-mcq-20","m-mcq-21","m-mcq-22","m-mcq-23","m-mcq-25","m-sa-2","m-mcq-19"] },
-        { id: "exam-5",  name: "Scientific notation",             focus: "MA5-MAG-C-01",
-          questionIds: ["m-mcq-26","m-mcq-27","m-mcq-28","m-mcq-29","m-mcq-32","m-sa-9"] },
-        { id: "exam-6",  name: "Significant figures & measurement", focus: "MA5-MAG-C-01",
-          questionIds: ["m-mcq-30","m-mcq-31","m-mcq-32","m-sa-9","m-mcq-26"] },
-        { id: "exam-7",  name: "Algebraic expansion",              focus: "MA5-ALG-C-01",
-          questionIds: ["m-mcq-33","m-mcq-34","m-mcq-35","m-mcq-36","m-mcq-37","m-mcq-38","m-sa-3"] },
-        { id: "exam-8",  name: "Algebraic fractions",              focus: "MA5-ALG-C-01",
-          questionIds: ["m-mcq-39","m-mcq-40","m-mcq-41","m-mcq-42","m-mcq-38"] },
-        { id: "exam-9",  name: "Linear equations (3-step)",        focus: "MA5-EQU-C-01",
-          questionIds: ["m-mcq-43","m-mcq-44","m-mcq-45","m-mcq-46","m-mcq-47"] },
-        { id: "exam-10", name: "Linear equations (multi-step)",    focus: "MA5-EQU-P-02",
-          questionIds: ["m-mcq-48","m-mcq-49","m-mcq-50","m-sa-4","m-mcq-45"] },
-        { id: "exam-11", name: "Quadratics — monic",               focus: "MA5-EQU-P-01",
-          questionIds: ["m-mcq-51","m-mcq-52","m-mcq-53","m-mcq-54","m-mcq-55","m-sa-5"] },
-        { id: "exam-12", name: "Quadratics — non-monic",           focus: "MA5-EQU-P-02",
-          questionIds: ["m-mcq-61","m-mcq-62","m-mcq-63","m-la-3"] },
-        { id: "exam-13", name: "Linear inequalities",              focus: "MA5-EQU-P-01",
-          questionIds: ["m-mcq-58","m-mcq-59","m-mcq-60","m-mcq-43"] },
-        { id: "exam-14", name: "Cubic equations",                  focus: "MA5-EQU-P-01",
-          questionIds: ["m-mcq-56","m-mcq-57","m-mcq-53"] },
-        { id: "exam-15", name: "Simultaneous equations",           focus: "MA5-EQU-P-02",
-          questionIds: ["m-mcq-64","m-mcq-65","m-mcq-66","m-sa-6","m-la-5"] },
-        { id: "exam-16", name: "Linear graphs — gradient & midpoint", focus: "MA5-LIN-C-01",
-          questionIds: ["m-mcq-67","m-mcq-68","m-mcq-69","m-mcq-70","m-mcq-71","m-mcq-72","m-la-1"] },
-        { id: "exam-17", name: "Slope-intercept form",             focus: "MA5-LIN-C-02",
-          questionIds: ["m-mcq-73","m-mcq-74","m-mcq-75","m-mcq-76","m-mcq-67"] },
-        { id: "exam-18", name: "Parallel & perpendicular lines",   focus: "MA5-LIN-P-01",
-          questionIds: ["m-mcq-77","m-mcq-78","m-mcq-79","m-mcq-80","m-mcq-81","m-sa-7","m-la-4"] },
-        { id: "exam-19", name: "Trigonometry — sides & angles",    focus: "MA5-TRG-C-01",
-          questionIds: ["m-mcq-82","m-mcq-83","m-mcq-84","m-mcq-85","m-mcq-86","m-mcq-87","m-mcq-88","m-mcq-89","m-sa-8"] },
-        { id: "exam-20", name: "Half-Yearly Mock — full mix",      focus: "All outcomes",
-          questionIds: ["m-mcq-3","m-mcq-15","m-mcq-23","m-mcq-32","m-mcq-37","m-mcq-46","m-mcq-52","m-mcq-65","m-mcq-71","m-mcq-78","m-mcq-83","m-mcq-90","m-mcq-94","m-la-1","m-la-3"] }
+    practiceTopics: [
+        { id: "indices",       name: "Indices & Index Laws",          outcomes: "MA5-IND-C-01 · MA5-IND-P-01", sourceTopics: ["indices-basic", "indices-negative"] },
+        { id: "surds",         name: "Surds & Fractional Indices",    outcomes: "MA5-IND-P-02",                sourceTopics: ["surds"] },
+        { id: "scientific",    name: "Scientific Notation & Sig Figs",outcomes: "MA5-MAG-C-01",                sourceTopics: ["scientific"] },
+        { id: "algebra",       name: "Algebraic Expansion & Fractions",outcomes:"MA5-ALG-C-01",                sourceTopics: ["expansion", "alg-fractions"] },
+        { id: "linear-eq",     name: "Linear Equations",              outcomes: "MA5-EQU-C-01 · MA5-EQU-P-02", sourceTopics: ["linear-eq", "linear-eq-multi"] },
+        { id: "quadratic",     name: "Quadratic Equations",           outcomes: "MA5-EQU-P-01 · MA5-EQU-P-02", sourceTopics: ["quadratic-monic", "quadratic-nonmonic"] },
+        { id: "ineq-cubic",    name: "Inequalities & Cubics",         outcomes: "MA5-EQU-P-01",                sourceTopics: ["inequalities", "quadratic-monic"] },
+        { id: "simultaneous",  name: "Simultaneous Equations",        outcomes: "MA5-EQU-P-02",                sourceTopics: ["simultaneous", "linear-eq-multi"] },
+        { id: "linear-graphs", name: "Linear Graphs",                 outcomes: "MA5-LIN-C-01 · LIN-C-02 · LIN-P-01", sourceTopics: ["midpoint-gradient", "slope-intercept", "lines-perp"] },
+        { id: "trigonometry",  name: "Trigonometry",                  outcomes: "MA5-TRG-C-01 · MA5-TRG-C-02", sourceTopics: ["trig-sides", "trig-angles", "trig-elev", "trig-bearings"] }
     ],
+    practiceExams: [],
 
     /* =========================================================
        MOCK EXAMS — full-length, mixed across all outcomes.

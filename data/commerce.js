@@ -1282,50 +1282,18 @@ window.SUBJECT_DATA.commerce = {
     ],
 
     /* =========================================================
-       PRACTICE EXAMS — 20 themed exams
+       PRACTICE QUESTIONS — 4 topic groups × 10 exams × 20 questions.
+       Generated at boot from `practiceTopics`. (Topic 1 covers
+       Consumer & Financial Decisions; Topic 2 covers Economic &
+       Business Environment.)
        ========================================================= */
-    practiceExams: [
-        { id: "exam-1",  name: "Consumer rights basics",         focus: "ACL, guarantees, cooling-off",
-          questionIds: ["c-mcq-1","c-mcq-2","c-mcq-3","c-mcq-4","c-mcq-5","c-mcq-6","c-mcq-10","c-sa-1"] },
-        { id: "exam-2",  name: "Consumer rights — ACL deep dive",focus: "ACL guarantees & remedies",
-          questionIds: ["c-mcq-7","c-mcq-8","c-mcq-9","c-mcq-10","c-sa-2","c-la-4"] },
-        { id: "exam-3",  name: "Smart consumer decisions",        focus: "Decision-making & influences",
-          questionIds: ["c-mcq-11","c-mcq-12","c-mcq-13","c-mcq-14","c-mcq-15","c-mcq-16","c-mcq-17","c-sa-3"] },
-        { id: "exam-4",  name: "Influences & ethical buying",     focus: "Bias, marketing, sustainability",
-          questionIds: ["c-mcq-17","c-mcq-18","c-mcq-19","c-mcq-20","c-sa-4","c-la-1"] },
-        { id: "exam-5",  name: "Consumer protection — ACCC & scams", focus: "Regulation & scams",
-          questionIds: ["c-mcq-21","c-mcq-22","c-mcq-23","c-mcq-24","c-mcq-25","c-mcq-26","c-mcq-27","c-mcq-28","c-sa-5"] },
-        { id: "exam-6",  name: "Personal finance & budgeting",    focus: "Budgets, needs vs wants",
-          questionIds: ["c-mcq-29","c-mcq-30","c-mcq-31","c-mcq-32","c-mcq-33","c-mcq-34","c-mcq-35","c-sa-6","c-sa-7"] },
-        { id: "exam-7",  name: "Saving & investing",              focus: "Compound interest, super, shares",
-          questionIds: ["c-mcq-38","c-mcq-39","c-mcq-40","c-mcq-41","c-mcq-42","c-mcq-43","c-mcq-44","c-mcq-45","c-sa-8"] },
-        { id: "exam-8",  name: "Payment options & credit",        focus: "Cards, BNPL, EFT",
-          questionIds: ["c-mcq-46","c-mcq-47","c-mcq-48","c-mcq-50","c-mcq-51","c-mcq-52","c-mcq-53","c-sa-9"] },
-        { id: "exam-9",  name: "Identity, fraud & financial safety", focus: "Cyber security & banks",
-          questionIds: ["c-mcq-26","c-mcq-49","c-mcq-25","c-sa-5","c-sa-10"] },
-        { id: "exam-10", name: "Economic environment basics",     focus: "Scarcity, opp cost, GDP",
-          questionIds: ["c-mcq-54","c-mcq-55","c-mcq-56","c-mcq-57","c-mcq-58","c-mcq-59","c-mcq-60","c-mcq-61"] },
-        { id: "exam-11", name: "Circular flow & taxation",        focus: "Flows, GST, progressive tax",
-          questionIds: ["c-mcq-60","c-mcq-61","c-mcq-62","c-mcq-63","c-mcq-75"] },
-        { id: "exam-12", name: "Markets & pricing",                focus: "Supply, demand, equilibrium",
-          questionIds: ["c-mcq-64","c-mcq-65","c-mcq-66","c-mcq-67","c-mcq-68","c-mcq-69","c-mcq-70","c-sa-12"] },
-        { id: "exam-13", name: "Money & RBA policy",               focus: "Inflation, cash rate, fiscal policy",
-          questionIds: ["c-mcq-71","c-mcq-72","c-mcq-73","c-mcq-74","c-mcq-75","c-mcq-76","c-sa-11","c-sa-13","c-la-3"] },
-        { id: "exam-14", name: "Business environment & sectors",   focus: "Sectors, internal/external, globalisation",
-          questionIds: ["c-mcq-77","c-mcq-78","c-mcq-79","c-mcq-80","c-mcq-81"] },
-        { id: "exam-15", name: "Business ownership types",          focus: "Sole trader → public company",
-          questionIds: ["c-mcq-82","c-mcq-83","c-mcq-84","c-mcq-85","c-mcq-86","c-mcq-87","c-mcq-88","c-sa-14"] },
-        { id: "exam-16", name: "Stakeholders & ethics",             focus: "CSR, triple bottom line",
-          questionIds: ["c-mcq-89","c-mcq-90","c-mcq-91","c-mcq-92","c-mcq-93","c-mcq-94","c-sa-15","c-sa-16","c-la-5"] },
-        { id: "exam-17", name: "Communication & sources (COM5-8)", focus: "Sources, charts, ethics",
-          questionIds: ["c-mcq-95","c-mcq-96","c-mcq-97","c-mcq-98","c-mcq-100","c-mcq-101","c-mcq-102","c-sa-17","c-sa-18"] },
-        { id: "exam-18", name: "Collaborative research (COM5-9)",   focus: "Research planning & teamwork",
-          questionIds: ["c-mcq-95","c-mcq-99","c-mcq-100","c-mcq-102","c-sa-17","c-sa-18","c-la-6"] },
-        { id: "exam-19", name: "Topic 1 mock — Consumer & Financial Decisions", focus: "Half-yearly Topic 1 dress rehearsal",
-          questionIds: ["c-mcq-2","c-mcq-13","c-mcq-19","c-mcq-22","c-mcq-31","c-mcq-39","c-mcq-47","c-mcq-50","c-sa-1","c-sa-7","c-la-1"] },
-        { id: "exam-20", name: "Topic 2 mock — Economic & Business Environment", focus: "Half-yearly Topic 2 dress rehearsal",
-          questionIds: ["c-mcq-55","c-mcq-58","c-mcq-66","c-mcq-71","c-mcq-77","c-mcq-83","c-mcq-90","c-mcq-94","c-sa-12","c-sa-13","c-sa-15","c-la-3","c-la-5"] }
+    practiceTopics: [
+        { id: "consumer",   name: "Topic 1 · Consumer Rights & Decisions", outcomes: "COM5-1 · COM5-2", sourceTopics: ["consumer-rights", "consumer-decisions", "consumer-protection"] },
+        { id: "finance",    name: "Topic 1 · Personal Finance, Saving & Payments", outcomes: "COM5-1 · COM5-2", sourceTopics: ["personal-finance", "saving-investing", "payment-credit"] },
+        { id: "economy",    name: "Topic 2 · The Economic Environment", outcomes: "COM5-1 · COM5-8", sourceTopics: ["economic-environment", "markets-pricing", "money-policy"] },
+        { id: "business",   name: "Topic 2 · The Business Environment", outcomes: "COM5-1 · COM5-2 · COM5-9", sourceTopics: ["business-environment", "business-types", "business-stakeholders", "communication"] }
     ],
+    practiceExams: [],
 
     /* =========================================================
        MOCK EXAMS — full-length, mixed across both topics.

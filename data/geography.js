@@ -1158,50 +1158,17 @@ window.SUBJECT_DATA.geography = {
     ],
 
     /* =========================================================
-       PRACTICE EXAMS — 20 themed exams
+       PRACTICE QUESTIONS — 4 topic groups × 10 exams × 20 questions.
+       Generated at boot from `practiceTopics`. (~60% HW + 40% EC&M
+       weighting.)
        ========================================================= */
-    practiceExams: [
-        { id: "exam-1",  name: "Wellbeing concepts",                   focus: "Defining wellbeing, dimensions, indicators",
-          questionIds: ["g-mcq-1","g-mcq-2","g-mcq-3","g-mcq-4","g-mcq-5","g-mcq-6","g-sa-1"] },
-        { id: "exam-2",  name: "Measuring wellbeing — HDI & GDP",       focus: "HDI, GDP, GNI, OECD indicators",
-          questionIds: ["g-mcq-7","g-mcq-8","g-mcq-9","g-mcq-10","g-mcq-12","g-mcq-13","g-mcq-14","g-mcq-15","g-sa-2"] },
-        { id: "exam-3",  name: "Limitations of wellbeing measures",     focus: "Inequality, environment, subjective WB",
-          questionIds: ["g-mcq-10","g-mcq-11","g-mcq-13","g-mcq-21","g-sa-3"] },
-        { id: "exam-4",  name: "Spatial variation — global",            focus: "Global wellbeing patterns",
-          questionIds: ["g-mcq-16","g-mcq-17","g-mcq-18","g-mcq-19","g-mcq-20","g-mcq-21","g-mcq-22","g-sa-4","g-la-1"] },
-        { id: "exam-5",  name: "Wellbeing in Australia",                focus: "Closing the Gap, SEIFA, regional disparity",
-          questionIds: ["g-mcq-23","g-mcq-24","g-mcq-25","g-mcq-26","g-mcq-27","g-mcq-28","g-sa-5"] },
-        { id: "exam-6",  name: "Strategies — global wellbeing",         focus: "SDGs, NGOs, microfinance",
-          questionIds: ["g-mcq-29","g-mcq-30","g-mcq-31","g-mcq-32","g-mcq-33","g-mcq-34","g-mcq-35","g-sa-6","g-la-5"] },
-        { id: "exam-7",  name: "Stakeholders & perspectives (wellbeing)", focus: "Multiple perspectives on wellbeing",
-          questionIds: ["g-mcq-36","g-mcq-37","g-mcq-38","g-sa-7"] },
-        { id: "exam-8",  name: "Wind power — how it works",             focus: "Turbine technology, capacity factor",
-          questionIds: ["g-mcq-39","g-mcq-40","g-mcq-41","g-mcq-42","g-mcq-43","g-mcq-44","g-mcq-45","g-mcq-46","g-sa-8"] },
-        { id: "exam-9",  name: "Wind in Australia",                     focus: "Australian wind farms & policy",
-          questionIds: ["g-mcq-47","g-mcq-48","g-mcq-49","g-mcq-50","g-mcq-51","g-mcq-52","g-mcq-53","g-mcq-54","g-mcq-55","g-sa-9"] },
-        { id: "exam-10", name: "Wind — environmental impacts",           focus: "Emissions, water, biodiversity, blades",
-          questionIds: ["g-mcq-56","g-mcq-57","g-mcq-58","g-mcq-59","g-mcq-60","g-mcq-61","g-mcq-62","g-mcq-63","g-sa-10","g-la-2"] },
-        { id: "exam-11", name: "Wind — community perspectives",          focus: "NIMBY, hosts, councils, NGOs, unions",
-          questionIds: ["g-mcq-64","g-mcq-65","g-mcq-66","g-mcq-67","g-mcq-68","g-mcq-69","g-mcq-70","g-mcq-71","g-sa-11","g-la-4"] },
-        { id: "exam-12", name: "Wind & Custodianship of Country",        focus: "GE5-APC-02 — FPIC, CHMP, Indigenous-led projects",
-          questionIds: ["g-mcq-72","g-mcq-73","g-mcq-74","g-mcq-75","g-mcq-76","g-mcq-77","g-mcq-78","g-sa-12","g-la-3"] },
-        { id: "exam-13", name: "Wind — policy & comparison",             focus: "Coal vs wind, RET, ISP, offshore",
-          questionIds: ["g-mcq-52","g-mcq-54","g-mcq-79","g-mcq-80","g-mcq-81","g-mcq-82","g-mcq-83","g-sa-13","g-la-6"] },
-        { id: "exam-14", name: "Geographical tools (GE5-COM-02)",        focus: "Maps, GIS, evaluating sources",
-          questionIds: ["g-mcq-84","g-mcq-85","g-mcq-86","g-mcq-87","g-mcq-88","g-mcq-89","g-sa-14","g-sa-15"] },
-        { id: "exam-15", name: "Wind farm — siting & EIS",               focus: "Site selection, EIS, cumulative impact",
-          questionIds: ["g-mcq-55","g-mcq-62","g-mcq-63","g-mcq-69","g-mcq-74","g-mcq-77","g-mcq-85","g-sa-14"] },
-        { id: "exam-16", name: "Renewables transition snapshot",          focus: "Where we are vs where we're going",
-          questionIds: ["g-mcq-47","g-mcq-48","g-mcq-52","g-mcq-53","g-mcq-54","g-mcq-81","g-mcq-83","g-la-6"] },
-        { id: "exam-17", name: "Comparing perspectives",                  focus: "GE5-PER-02 cross-cutting",
-          questionIds: ["g-mcq-36","g-mcq-37","g-mcq-38","g-mcq-66","g-mcq-68","g-mcq-70","g-sa-7","g-sa-11"] },
-        { id: "exam-18", name: "Half-Yearly Mock 1 — Human Wellbeing focus", focus: "Mock paper (HW heavy)",
-          questionIds: ["g-mcq-1","g-mcq-7","g-mcq-9","g-mcq-16","g-mcq-23","g-mcq-29","g-mcq-39","g-mcq-56","g-mcq-72","g-sa-1","g-sa-5","g-sa-12","g-la-1"] },
-        { id: "exam-19", name: "Half-Yearly Mock 2 — Wind Power focus",  focus: "Mock paper (EC&M heavy)",
-          questionIds: ["g-mcq-39","g-mcq-44","g-mcq-49","g-mcq-56","g-mcq-58","g-mcq-64","g-mcq-72","g-mcq-77","g-mcq-79","g-mcq-83","g-sa-8","g-sa-10","g-sa-12","g-la-2"] },
-        { id: "exam-20", name: "Half-Yearly Mock 3 — Full mix",          focus: "Balanced HW (25%) + EC&M (15%)",
-          questionIds: ["g-mcq-2","g-mcq-10","g-mcq-22","g-mcq-25","g-mcq-32","g-mcq-38","g-mcq-42","g-mcq-50","g-mcq-58","g-mcq-66","g-mcq-73","g-mcq-80","g-mcq-86","g-sa-2","g-sa-9","g-sa-13","g-la-2","g-la-4"] }
+    practiceTopics: [
+        { id: "wellbeing-concepts",  name: "HW · Concepts & Measures",         outcomes: "GE5-COM-02 · GE5-PER-02", sourceTopics: ["wellbeing-concepts", "wellbeing-measures"] },
+        { id: "wellbeing-patterns",  name: "HW · Spatial Patterns & Australia",outcomes: "GE5-PER-02",              sourceTopics: ["wellbeing-spatial", "wellbeing-australia", "wellbeing-strategies", "wellbeing-perspectives"] },
+        { id: "wind-tech",           name: "EC&M · Wind Power Technology",     outcomes: "GE5-COM-02",              sourceTopics: ["wind-tech", "wind-australia", "wind-policy"] },
+        { id: "wind-management",     name: "EC&M · Wind Management & Custodianship", outcomes: "GE5-APC-02 · GE5-PER-02", sourceTopics: ["wind-environmental", "wind-perspectives", "wind-custodianship", "geo-tools"] }
     ],
+    practiceExams: [],
 
     /* =========================================================
        MOCK EXAMS — full-length, mixed across both topic areas.

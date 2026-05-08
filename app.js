@@ -6,6 +6,88 @@
 
     const STORAGE_KEY = "harper-studyguide-v1";
     const SUBJECTS = ["commerce", "english", "geography", "maths"];
+    const PRACTICE_EXAMS_PER_TOPIC = 10;
+    const PRACTICE_QS_PER_EXAM = 20;
+    const PRACTICE_MCQ = 14;
+    const PRACTICE_SA = 5;
+    const PRACTICE_LA = 1;
+
+    /* ---------- Practice exam generator (deterministic) ---------- */
+
+    function _mulberry32(a) {
+        return function () {
+            let t = a += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+    function _hashStr(s) {
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+        return h >>> 0;
+    }
+    function _shuffle(arr, rng) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }
+    function _pickN(pool, n, rng) {
+        if (!pool.length || n <= 0) return [];
+        const shuffled = _shuffle(pool, rng);
+        const out = shuffled.slice(0, Math.min(n, shuffled.length));
+        // Pad with random duplicates if pool was too small (acceptable for practice)
+        while (out.length < n) {
+            out.push(pool[Math.floor(rng() * pool.length)]);
+        }
+        return out;
+    }
+
+    function generatePracticeExams() {
+        SUBJECTS.forEach(subjectId => {
+            const subj = window.SUBJECT_DATA[subjectId];
+            if (!subj || !Array.isArray(subj.practiceTopics)) return;
+            const mcqsByTopic = groupBy(subj.mcqs || [], q => q.topic);
+            const shortByTopic = groupBy(subj.short || [], q => q.topic);
+            const longByTopic = groupBy(subj.long || [], q => q.topic);
+            const exams = [];
+            for (const t of subj.practiceTopics) {
+                const mcqPool = (t.sourceTopics || []).flatMap(id => (mcqsByTopic[id] || []).map(q => q.id));
+                const shortPool = (t.sourceTopics || []).flatMap(id => (shortByTopic[id] || []).map(q => q.id));
+                const longPool = (t.sourceTopics || []).flatMap(id => (longByTopic[id] || []).map(q => q.id));
+                t.examIds = [];
+                for (let n = 1; n <= PRACTICE_EXAMS_PER_TOPIC; n++) {
+                    const examId = `exam-${t.id}-${n}`;
+                    const rng = _mulberry32(_hashStr(examId));
+                    const long = _pickN(longPool, PRACTICE_LA, rng);
+                    const short = _pickN(shortPool, PRACTICE_SA, rng);
+                    const mcqs = _pickN(mcqPool, PRACTICE_QS_PER_EXAM - long.length - short.length, rng);
+                    exams.push({
+                        id: examId,
+                        topicId: t.id,
+                        topicName: t.name,
+                        name: `${t.name} — Set ${String(n).padStart(2, "0")}`,
+                        focus: t.outcomes || "",
+                        questionIds: mcqs.concat(short, long)
+                    });
+                    t.examIds.push(examId);
+                }
+            }
+            subj.practiceExams = exams;
+        });
+    }
+
+    function groupBy(arr, keyFn) {
+        const out = {};
+        for (const item of arr) {
+            const k = keyFn(item);
+            (out[k] = out[k] || []).push(item);
+        }
+        return out;
+    }
 
     /* ---------- State ---------- */
 
@@ -32,8 +114,31 @@
         return {
             subjects,
             settings: { reducedMotion: false },
-            stats: { totalAnswered: 0, totalCorrect: 0, currentStreak: 0, bestStreak: 0 }
+            stats: { totalAnswered: 0, totalCorrect: 0, currentStreak: 0, bestStreak: 0 },
+            clan: {
+                cats: [],            // [{ breedId, name, dateISO, lastInteractedISO, happiness }]
+                claimTickets: 0,     // tokens to spend on a new cat
+                perfectExams: {}     // mode -> true once a 100% has been scored (one ticket per exam)
+            },
+            breaks: {
+                lastBreakStartISO: null   // when the most recent break STARTED
+            }
         };
+    }
+
+    const BREAK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between breaks
+
+    function breakCooldownRemaining() {
+        const last = state.breaks && state.breaks.lastBreakStartISO;
+        if (!last) return 0;
+        const elapsed = Date.now() - new Date(last).getTime();
+        return Math.max(0, BREAK_COOLDOWN_MS - elapsed);
+    }
+
+    function recordBreakStart() {
+        state.breaks = state.breaks || {};
+        state.breaks.lastBreakStartISO = new Date().toISOString();
+        saveState();
     }
 
     function saveState() {
@@ -89,18 +194,51 @@
     function render() {
         const route = parseRoute();
         const root = $("#app");
+        // Stop any park timers if we're leaving the park-play view
+        const goingToParkPlay = route[0] === "clan" && route[1] === "park" && route[2] === "play";
+        if (!goingToParkPlay && window.Park && window.Park.stop) window.Park.stop();
+        // Stop tetris if leaving break
+        const goingToBreak = route[0] === "break";
+        if (!goingToBreak && window.CatTetris && window.CatTetris.stop) window.CatTetris.stop();
+        if (!goingToBreak && window._breakLockoutTimer) {
+            clearTimeout(window._breakLockoutTimer);
+            window._breakLockoutTimer = null;
+        }
         root.innerHTML = "";
         root.scrollIntoView({ behavior: "instant", block: "start" });
         window.scrollTo(0, 0);
 
+        updateClanBadge();
         if (route.length === 0) return renderHome(root);
         if (route[0] === "progress") return renderProgress(root);
+        if (route[0] === "break") return renderBreak(root);
+        if (route[0] === "clan") {
+            if (route[1] === "claim") return renderClaim(root);
+            if (route[1] === "park") {
+                if (route[2] === "play") return renderParkPlay(root);
+                return renderParkSelect(root);
+            }
+            if (route[1] === "cat" && route[2]) return renderCatDetail(root, route[2]);
+            return renderClan(root);
+        }
         if (route[0] === "subject" && route[1]) {
             const subjectId = route[1];
             if (route[2] === "quiz" && route[3]) return renderQuiz(root, subjectId, route[3], route[4] || null);
             return renderSubject(root, subjectId);
         }
         renderHome(root);
+    }
+
+    function updateClanBadge() {
+        const badge = document.getElementById("clan-badge");
+        if (!badge) return;
+        const tickets = (state.clan && state.clan.claimTickets) || 0;
+        if (tickets > 0) {
+            badge.textContent = tickets;
+            badge.hidden = false;
+        } else {
+            badge.hidden = true;
+        }
     }
 
     /* ---------- Home view ---------- */
@@ -178,14 +316,14 @@
                 </div>
             </header>
 
-            ${renderMockExamsSection(subjectId, subj)}
+            ${renderPracticeQuestionsSection(subjectId, subj)}
 
-            ${renderPracticeExamsSection(subjectId, subj)}
+            ${renderMockExamsSection(subjectId, subj)}
 
             ${isMaths ? `
             <aside class="maths-tip">
                 <strong>💡 Need a hand?</strong>
-                Every Maths question has a <em>Help</em> button — tap it for step-by-step working.
+                Every Maths Practice question has a <em>Help</em> button — tap it for step-by-step working. (Help is hidden during Mock Exams to mirror real exam conditions.)
             </aside>` : ""}
         `;
     }
@@ -239,33 +377,57 @@
         return c;
     }
 
-    function renderPracticeExamsSection(subjectId, subj) {
+    function renderPracticeQuestionsSection(subjectId, subj) {
         if (!Array.isArray(subj.practiceExams) || !subj.practiceExams.length) return "";
         const subjState = state.subjects[subjectId] || { quizSessions: [], bestScores: {} };
-        const cards = subj.practiceExams.map((exam, idx) => {
+
+        const examCard = (exam, n) => {
             const best = subjState.bestScores ? subjState.bestScores[exam.id] : null;
-            const last = (subjState.quizSessions || []).filter(s => s.mode === exam.id).slice(-1)[0];
+            const attempts = (subjState.quizSessions || []).filter(s => s.mode === exam.id).length;
             const bestPct = best != null ? Math.round(best * 100) + "%" : "—";
-            const lastLine = last ? `${last.score}/${last.total}` : "Not yet attempted";
-            const num = String(idx + 1).padStart(2, "0");
+            const isPerfect = best != null && best >= 0.999;
             return `
-                <a class="exam-card" href="#/subject/${subjectId}/quiz/${exam.id}">
-                    <div class="exam-num">Exam ${num}</div>
-                    <h4>${escapeHtml(exam.name)}</h4>
-                    <p class="exam-focus">${escapeHtml(exam.focus || "")}</p>
+                <a class="exam-card ${isPerfect ? "is-perfect" : ""}" href="#/subject/${subjectId}/quiz/${exam.id}">
+                    <div class="exam-num">Set ${String(n).padStart(2, "0")} ${isPerfect ? "🌟" : ""}</div>
+                    <p class="exam-focus">${exam.questionIds.length} questions · ${attempts} attempt${attempts === 1 ? "" : "s"}</p>
                     <div class="exam-meta">
-                        <span>${exam.questionIds.length} Q</span>
-                        <span>Best: ${bestPct}</span>
-                        <span>Last: ${escapeHtml(lastLine)}</span>
+                        <span class="exam-best">🏆 Best: <strong>${bestPct}</strong></span>
                     </div>
                 </a>
             `;
-        }).join("");
+        };
+
+        let body;
+        if (Array.isArray(subj.practiceTopics) && subj.practiceTopics.length) {
+            const examsById = Object.create(null);
+            subj.practiceExams.forEach(e => { examsById[e.id] = e; });
+            const groups = subj.practiceTopics.map(t => {
+                const cards = (t.examIds || []).map((id, i) => examsById[id] ? examCard(examsById[id], i + 1) : "").join("");
+                const topicBest = (t.examIds || []).reduce((b, id) => Math.max(b, (subjState.bestScores || {})[id] || 0), 0);
+                return `
+                    <div class="practice-topic-group">
+                        <header class="practice-topic-header">
+                            <div>
+                                <h3>${escapeHtml(t.name)}</h3>
+                                <p class="practice-topic-focus">${escapeHtml(t.outcomes || "")}</p>
+                            </div>
+                            <div class="practice-topic-best">🏆 ${Math.round(topicBest * 100)}%</div>
+                        </header>
+                        <div class="exam-grid">${cards}</div>
+                    </div>
+                `;
+            }).join("");
+            body = groups;
+        } else {
+            const cards = subj.practiceExams.map((e, i) => examCard(e, i + 1)).join("");
+            body = `<div class="exam-grid">${cards}</div>`;
+        }
+
         return `
             <section class="exams-section">
-                <h2>Practice exams (${subj.practiceExams.length})</h2>
-                <p class="exams-blurb">Pick any exam below — each one is a curated mix of multiple-choice and longer-form questions, themed by topic. Best scores are saved per exam.</p>
-                <div class="exam-grid">${cards}</div>
+                <h2>🎯 Practice Questions <span class="section-tag">${subj.practiceExams.length} sets · 20 questions each</span></h2>
+                <p class="section-blurb">Each set is a focused, topic-themed bundle of 20 questions. Answers lock once placed, and you can re-attempt as many times as you like. Help is available on every question. Score 100% to unlock a new cat for your clan!</p>
+                ${body}
             </section>
         `;
     }
@@ -337,21 +499,30 @@
             return;
         }
         const exam = findExam(subj, mode);
-        // Practice exams and mocks keep curated order; other modes shuffle.
+        // Practice and mocks keep curated order; other modes shuffle.
         const ordered = exam ? questions : shuffle(questions);
         const isMock = !!(exam && exam.isMock);
+        // Lock-in applies to BOTH Practice Questions and Mock Exams.
+        const isLockMode = !!exam;
+        // Tag each position with a unique key so duplicate question IDs in an
+        // exam (allowed when pools are small) get independent session state.
+        const tagged = ordered.map((q, i) => Object.assign({}, q, { _sessionKey: `${i}-${q.id}` }));
         session = {
             subjectId, mode, exam,
             isMock,
-            questions: ordered,
+            isLockMode,
+            questions: tagged,
             index: 0,
             correct: 0,
             attempted: 0,
-            answers: {}, // qid -> { user, userText, correct, locked, revealed }
+            answers: {}, // sessionKey -> { user, userText, correct, locked, revealed }
             sessionStreak: 0
         };
         renderCurrentQuestion(root);
     }
+
+    // Per-position key used for session.answers (so duplicate q.id's stay separate)
+    function keyOf(q) { return q._sessionKey || q.id; }
 
     function renderCurrentQuestion(root) {
         const subj = window.SUBJECT_DATA[session.subjectId];
@@ -360,18 +531,22 @@
         const total = session.questions.length;
         const num = session.index + 1;
         const topic = subj.topics.find(t => t.id === q.topic);
-        const previous = session.answers[q.id];
+        const previous = session.answers[keyOf(q)];
         const isLocked = !!(previous && previous.locked);
         const isLastQuestion = session.index === total - 1;
 
         root.innerHTML = `
-            <a class="back-link" href="#/subject/${session.subjectId}">← Back${session.isMock ? " (exits mock)" : ""}</a>
-            <div class="quiz-shell ${session.isMock ? "is-mock" : ""}" style="--accent:${subj.color}">
+            <a class="back-link" href="#/subject/${session.subjectId}">← Back${session.isLockMode ? " (exits attempt)" : ""}</a>
+            <div class="quiz-shell ${session.isMock ? "is-mock" : (session.isLockMode ? "is-practice" : "")}" style="--accent:${subj.color}">
                 ${session.isMock ? `
-                    <div class="mock-banner">
-                        🔒 <strong>Mock Exam mode</strong> — once you press Next, your answer is locked.
+                    <div class="mock-banner mock-banner-mock">
+                        🔒 <strong>Mock Exam</strong> — once you press Next, your answer is locked. Help is hidden.
                     </div>
-                ` : ""}
+                ` : (session.isLockMode ? `
+                    <div class="mock-banner mock-banner-practice">
+                        🔒 <strong>Practice Questions</strong> — answers lock once you press Next. Use 💡 Help anytime, and re-attempt to improve.
+                    </div>
+                ` : "")}
                 <div class="quiz-progress">
                     <div class="quiz-meta">
                         <span class="quiz-subject">${subj.icon} ${escapeHtml(subj.name)}</span>
@@ -424,14 +599,15 @@
         const area = $("#answer-area");
         const subj = window.SUBJECT_DATA[session.subjectId];
         const type = questionType(q, subj);
+        const k = keyOf(q);
         if (type === "mcq") {
             area.innerHTML = q.options.map((opt, i) => {
-                const id = `opt-${q.id}-${i}`;
+                const id = `opt-${k}-${i}`;
                 const checked = previous && previous.user === i ? "checked" : "";
                 const disabled = isLocked ? "disabled" : "";
                 return `
                     <label class="option ${isLocked ? "is-locked" : ""}" for="${id}">
-                        <input type="radio" name="opt-${q.id}" id="${id}" value="${i}" ${checked} ${disabled}>
+                        <input type="radio" name="opt-${k}" id="${id}" value="${i}" ${checked} ${disabled}>
                         <span class="option-letter">${String.fromCharCode(65 + i)}</span>
                         <span class="option-text">${renderText(opt)}</span>
                     </label>
@@ -474,27 +650,27 @@
             const ta = $("#written-answer");
             if (ta && !isLocked) {
                 ta.addEventListener("input", e => {
-                    if (!session.answers[q.id]) session.answers[q.id] = { userText: "", correct: false };
-                    session.answers[q.id].userText = e.target.value;
+                    if (!session.answers[k]) session.answers[k] = { userText: "", correct: false };
+                    session.answers[k].userText = e.target.value;
                 });
             }
             const revealBtn = $("#reveal-sample");
             if (revealBtn) {
                 revealBtn.addEventListener("click", () => {
-                    if (!session.answers[q.id]) session.answers[q.id] = { userText: "", correct: false };
-                    session.answers[q.id].revealed = !session.answers[q.id].revealed;
-                    renderAnswerArea(q, session.answers[q.id], isLocked);
+                    if (!session.answers[k]) session.answers[k] = { userText: "", correct: false };
+                    session.answers[k].revealed = !session.answers[k].revealed;
+                    renderAnswerArea(q, session.answers[k], isLocked);
                 });
             }
             const selfBtn = $("#self-correct");
             if (selfBtn) {
                 selfBtn.addEventListener("click", () => {
-                    if (!session.answers[q.id]) session.answers[q.id] = { userText: ($("#written-answer") || {}).value || "", correct: false };
-                    session.answers[q.id].correct = !session.answers[q.id].correct;
-                    if (session.answers[q.id].correct) {
+                    if (!session.answers[k]) session.answers[k] = { userText: ($("#written-answer") || {}).value || "", correct: false };
+                    session.answers[k].correct = !session.answers[k].correct;
+                    if (session.answers[k].correct) {
                         window.Cats.popIn({ expression: "cheering", message: pickPhrase("correct") });
                     }
-                    renderAnswerArea(q, session.answers[q.id], isLocked);
+                    renderAnswerArea(q, session.answers[k], isLocked);
                 });
             }
         }
@@ -506,22 +682,33 @@
     }
 
     function evaluateMCQ(q, silent, isLocked) {
-        const selected = $$('input[name="opt-' + q.id + '"]:checked')[0];
+        const k = keyOf(q);
+        const selected = $$('input[name="opt-' + k + '"]:checked')[0];
         if (!selected) return;
         const idx = parseInt(selected.value, 10);
         const correct = idx === q.answer;
 
-        // For mocks: only show feedback after the question is locked.
-        const showFeedback = !session.isMock || isLocked;
+        // Lock-on-click: in any lock mode (practice or mock), placing the
+        // answer locks it for the rest of this attempt.
+        const willLock = !silent && session.isLockMode;
+        const prevLocked = session.answers[k] && session.answers[k].locked;
+        const nowLocked = isLocked || prevLocked || willLock;
+
+        // Mocks suppress feedback until the exam ends; practice shows it on lock.
+        const showFeedback = !session.isMock;
 
         $$(".option").forEach((label, i) => {
-            label.classList.remove("option-correct", "option-incorrect", "option-revealed");
+            label.classList.remove("option-correct", "option-incorrect", "option-revealed", "option-selected");
             if (showFeedback) {
                 if (i === q.answer) label.classList.add("option-revealed");
                 if (i === idx) label.classList.add(correct ? "option-correct" : "option-incorrect");
             } else if (i === idx) {
-                // Only mark the user's selection (no correctness reveal yet)
                 label.classList.add("option-selected");
+            }
+            if (nowLocked) {
+                label.classList.add("is-locked");
+                const inp = label.querySelector('input');
+                if (inp) inp.disabled = true;
             }
         });
 
@@ -533,13 +720,28 @@
                     <p>${renderText(q.explain || "")}</p>
                 </div>
             `;
+        } else if (nowLocked) {
+            fb.innerHTML = `<div class="feedback-box neutral"><strong>🔒 Answer locked.</strong><p>You'll see feedback when the mock is finished.</p></div>`;
         } else {
             fb.innerHTML = "";
         }
 
-        // Preserve any existing locked flag.
-        const prevLocked = session.answers[q.id] && session.answers[q.id].locked;
-        session.answers[q.id] = { user: idx, correct, locked: !!prevLocked };
+        session.answers[k] = { user: idx, correct, locked: nowLocked };
+
+        // Show the locked indicator dynamically if it wasn't there before.
+        if (willLock) {
+            const card = document.querySelector(".question-card");
+            if (card && !card.classList.contains("is-locked")) {
+                card.classList.add("is-locked");
+                const indicator = document.createElement("div");
+                indicator.className = "locked-indicator";
+                indicator.textContent = "🔒 Answer locked — review only";
+                const promptEl = card.querySelector(".question-prompt");
+                if (promptEl && !card.querySelector(".locked-indicator")) {
+                    promptEl.parentNode.insertBefore(indicator, promptEl.nextSibling);
+                }
+            }
+        }
 
         if (!silent && !session.isMock) {
             if (correct) {
@@ -573,18 +775,21 @@
 
     function commitAnswer(q) {
         const subjState = state.subjects[session.subjectId];
-        const ans = session.answers[q.id];
+        const k = keyOf(q);
+        const ans = session.answers[k];
         if (!ans) {
-            // In a mock, even an unanswered question gets locked (with no answer) on Next.
-            if (session.isMock) {
-                session.answers[q.id] = { locked: true, correct: false };
+            // In any lock-mode (practice OR mock), an unanswered question gets locked on Next.
+            if (session.isLockMode) {
+                session.answers[k] = { locked: true, correct: false };
             }
             return;
         }
-        // In mock mode: lock the answer permanently for this exam.
-        if (session.isMock) ans.locked = true;
+        // Lock answers in any lock-mode (practice OR mock).
+        if (session.isLockMode) ans.locked = true;
 
         const wasCorrect = !!ans.correct;
+        // Per-question history (subjState.attempts) is keyed by the canonical q.id
+        // so it aggregates across all duplicate positions and exam re-attempts.
         const prior = subjState.attempts[q.id];
         const wasNew = !prior;
         subjState.attempts[q.id] = {
@@ -609,7 +814,7 @@
         const total = session.questions.length;
         let correct = 0;
         session.questions.forEach(q => {
-            const a = session.answers[q.id];
+            const a = session.answers[keyOf(q)];
             if (a && a.correct) correct++;
         });
         const ratio = total ? correct / total : 0;
@@ -627,6 +832,18 @@
             date: new Date().toISOString()
         });
         if (isNewBest) subjState.bestScores[session.mode] = ratio;
+
+        // 🐾 Cat clan: scoring 100% on an exam grants a claim ticket (one per exam ID).
+        const isPerfect = total > 0 && correct === total;
+        let grantedTicket = false;
+        if (isPerfect) {
+            state.clan = state.clan || { cats: [], claimTickets: 0, perfectExams: {} };
+            if (!state.clan.perfectExams[session.mode]) {
+                state.clan.perfectExams[session.mode] = true;
+                state.clan.claimTickets = (state.clan.claimTickets || 0) + 1;
+                grantedTicket = true;
+            }
+        }
         saveState();
 
         const cat = window.Cats.celebrate(ratio);
@@ -682,17 +899,29 @@
                     </div>
                 </div>
 
+                ${grantedTicket ? `
+                    <div class="ticket-banner">
+                        <div class="ticket-icon">🎟️</div>
+                        <div>
+                            <strong>Cat ticket earned!</strong>
+                            <p>You scored 100% — pick a new cat for your clan.</p>
+                        </div>
+                        <a class="primary-btn pulse-btn" href="#/clan/claim">Claim cat 🐾</a>
+                    </div>
+                ` : ""}
+
                 <div class="results-actions">
                     <a class="primary-btn pulse-btn" href="#/subject/${session.subjectId}/quiz/${session.mode}">🔁 Retake ${isMock ? "Mock" : "Practice"}</a>
                     <a class="ghost-btn" href="#/subject/${session.subjectId}">← Back to ${escapeHtml(subj.name)}</a>
                     <a class="ghost-btn" href="#/">🏠 Home</a>
+                    <a class="ghost-btn" href="#/clan">🐾 My Clan</a>
                 </div>
 
                 <details class="results-detail">
                     <summary>📋 Review every question</summary>
                     <ol class="results-list">
                         ${session.questions.map((q, i) => {
-                            const a = session.answers[q.id] || {};
+                            const a = session.answers[keyOf(q)] || {};
                             const ok = a.correct;
                             const userBlock = a.user != null
                                 ? `<div class="review-user">Your answer: ${escapeHtml(q.options[a.user] || "")}</div>`
@@ -856,6 +1085,481 @@
         `;
     }
 
+    /* ---------- Cat Clan ---------- */
+
+    function clanState() {
+        if (!state.clan) state.clan = { cats: [], claimTickets: 0, perfectExams: {} };
+        if (!Array.isArray(state.clan.cats)) state.clan.cats = [];
+        if (!state.clan.perfectExams) state.clan.perfectExams = {};
+        return state.clan;
+    }
+
+    function renderClan(root) {
+        const cs = clanState();
+        const total = window.Clan.totalBreeds();
+        const own = cs.cats.length;
+        const tickets = cs.claimTickets || 0;
+
+        if (own === 0 && tickets === 0) {
+            root.innerHTML = `
+                <a class="back-link" href="#/">← Home</a>
+                <section class="clan-empty">
+                    <div class="clan-empty-cat">${window.Cats.svg("wave", "ginger")}</div>
+                    <h1>Your cat clan is waiting!</h1>
+                    <p>Score <strong>100%</strong> on any practice set or mock exam to earn a 🎟️ <strong>Cat Ticket</strong>. Spend the ticket to choose a new cat for your clan.</p>
+                    <p>There are <strong>${total}</strong> different breeds to collect — each with its own personality, traits, and signature phrases.</p>
+                    <a class="primary-btn" href="#/">Start a quiz →</a>
+                </section>
+            `;
+            return;
+        }
+
+        const catCards = cs.cats.map(cat => {
+            const breed = window.Clan.findBreed(cat.breedId);
+            if (!breed) return "";
+            const happy = window.Clan.currentHappiness(cat);
+            const mood = window.Clan.moodFor(happy);
+            return `
+                <a class="clan-card mood-${mood.label.toLowerCase()}" href="#/clan/cat/${cat.breedId}">
+                    <div class="clan-card-svg">${window.Cats.breedSvg(breed.appearance, mood.expression)}</div>
+                    <h3>${escapeHtml(cat.name)}</h3>
+                    <p class="clan-card-breed">${escapeHtml(breed.breed)}</p>
+                    <p class="clan-card-mood">${mood.label === "Lonely" ? "😿" : mood.label === "Bored" ? "😼" : mood.label === "Content" ? "😺" : mood.label === "Happy" ? "😸" : "😻"} ${mood.label}</p>
+                    <div class="clan-card-bar"><span style="width:${happy}%"></span></div>
+                </a>
+            `;
+        }).join("");
+
+        const ticketsBlock = tickets > 0 ? `
+            <div class="clan-tickets-banner">
+                <div class="clan-tickets-icon">🎟️</div>
+                <div>
+                    <strong>${tickets} Cat Ticket${tickets === 1 ? "" : "s"} ready to spend!</strong>
+                    <p>Pick your next cat.</p>
+                </div>
+                <a class="primary-btn pulse-btn" href="#/clan/claim">Claim a cat 🐾</a>
+            </div>
+        ` : `
+            <p class="clan-tip">Score 100% on any quiz to earn a new 🎟️ Cat Ticket.</p>
+        `;
+
+        const visitParkBtn = own > 0 ? `
+            <a class="park-cta" href="#/clan/park">🌿 Visit the Park <span class="park-cta-sub">(take up to 5 cats)</span></a>
+        ` : "";
+
+        root.innerHTML = `
+            <a class="back-link" href="#/">← Home</a>
+            <header class="clan-header">
+                <h1>🐾 Harper's Cat Clan</h1>
+                <p>${own} / ${total} cats collected</p>
+                <div class="clan-progress-bar"><span style="width:${pct(own, total)}%"></span></div>
+            </header>
+            ${ticketsBlock}
+            ${visitParkBtn}
+            <section class="clan-grid">${catCards}</section>
+        `;
+    }
+
+    /* ---------- Break (cat Tetris) ---------- */
+
+    function renderBreak(root) {
+        const remaining = breakCooldownRemaining();
+        if (remaining > 0) {
+            renderBreakLockout(root, remaining);
+            return;
+        }
+        // Mark this break as started, then hand the root to CatTetris.
+        recordBreakStart();
+        window.CatTetris.start(root, {
+            onExit: () => navigate("/")
+        });
+    }
+
+    function renderBreakLockout(root, remainingMs) {
+        const m = Math.floor(remainingMs / 60000);
+        const s = Math.floor((remainingMs % 60000) / 1000);
+        const lastDate = state.breaks && state.breaks.lastBreakStartISO ? new Date(state.breaks.lastBreakStartISO) : null;
+        const lastStr = lastDate ? lastDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+
+        root.innerHTML = `
+            <a class="back-link" href="#/">← Home</a>
+            <section class="break-lockout">
+                <div class="break-lockout-cat">${window.Cats.svg("napping", "cream")}</div>
+                <h1>Studying first ✏️</h1>
+                <p class="break-blurb">Breaks are limited to <strong>one every 30 minutes</strong> so they actually feel like a break.</p>
+                <div class="break-countdown">
+                    <div class="break-countdown-num" id="break-cooldown" data-target="${remainingMs}">${m}:${String(s).padStart(2, "0")}</div>
+                    <div class="break-countdown-sub">until your next break</div>
+                </div>
+                <p class="break-meta">Last break started at <strong>${escapeHtml(lastStr)}</strong>.</p>
+                <div class="break-lockout-actions">
+                    <a class="primary-btn" href="#/">Pick a quiz</a>
+                    <a class="ghost-btn" href="#/clan">🐾 Visit my clan instead</a>
+                </div>
+            </section>
+        `;
+        // Live countdown
+        const tick = () => {
+            const r = breakCooldownRemaining();
+            const el = document.getElementById("break-cooldown");
+            if (!el) return; // navigated away
+            if (r <= 0) {
+                navigate("/break"); // auto-redirect once unlocked
+                return;
+            }
+            const mm = Math.floor(r / 60000);
+            const ss = Math.floor((r % 60000) / 1000);
+            el.textContent = `${mm}:${String(ss).padStart(2, "0")}`;
+            window._breakLockoutTimer = setTimeout(tick, 500);
+        };
+        if (window._breakLockoutTimer) clearTimeout(window._breakLockoutTimer);
+        window._breakLockoutTimer = setTimeout(tick, 500);
+    }
+
+    /* ---------- Park: cat-selection screen ---------- */
+
+    function renderParkSelect(root) {
+        const cs = clanState();
+        if (!cs.cats.length) { navigate("/clan"); return; }
+        cs.parkSelection = cs.parkSelection || [];
+
+        const selected = new Set(cs.parkSelection);
+
+        const catCards = cs.cats.map(cat => {
+            const breed = window.Clan.findBreed(cat.breedId);
+            if (!breed) return "";
+            const isSel = selected.has(cat.breedId);
+            return `
+                <button type="button" class="park-pick ${isSel ? "is-picked" : ""}" data-id="${cat.breedId}">
+                    <div class="park-pick-svg">${window.Cats.breedSvg(breed.appearance, "wave")}</div>
+                    <div class="park-pick-name">${escapeHtml(cat.name)}</div>
+                    <div class="park-pick-breed">${escapeHtml(breed.breed)}</div>
+                    ${isSel ? `<div class="park-pick-check">✓</div>` : ""}
+                </button>
+            `;
+        }).join("");
+
+        root.innerHTML = `
+            <a class="back-link" href="#/clan">← Back to Clan</a>
+            <header class="park-header">
+                <h1>🌿 Visit the Park</h1>
+                <p>Pick up to <strong>5 cats</strong> to take with you.</p>
+            </header>
+            <div class="park-select-bar">
+                <span id="park-select-count">${cs.parkSelection.length} of 5 chosen</span>
+                <button type="button" class="primary-btn pulse-btn" id="park-go-btn" ${cs.parkSelection.length === 0 ? "disabled" : ""}>Off to the Park! 🐾</button>
+            </div>
+            <section class="park-pick-grid">${catCards}</section>
+        `;
+
+        $$(".park-pick").forEach(el => {
+            el.addEventListener("click", () => {
+                const id = el.dataset.id;
+                const idx = cs.parkSelection.indexOf(id);
+                if (idx >= 0) {
+                    cs.parkSelection.splice(idx, 1);
+                } else if (cs.parkSelection.length < 5) {
+                    cs.parkSelection.push(id);
+                } else {
+                    return; // max selected
+                }
+                saveState();
+                renderParkSelect(root);
+            });
+        });
+        $("#park-go-btn").addEventListener("click", () => {
+            if (cs.parkSelection.length === 0) return;
+            navigate("/clan/park/play");
+        });
+    }
+
+    /* ---------- Park: play view ---------- */
+
+    function renderParkPlay(root) {
+        const cs = clanState();
+        const ids = cs.parkSelection || [];
+        if (!ids.length) { navigate("/clan/park"); return; }
+        const selectedCats = ids
+            .map(id => cs.cats.find(c => c.breedId === id))
+            .filter(Boolean);
+        if (!selectedCats.length) { navigate("/clan/park"); return; }
+
+        // park.js takes over the root
+        window.Park.start(root, selectedCats, {
+            onExit: () => {
+                // bump happiness for all visited cats and return to clan
+                selectedCats.forEach(c => {
+                    c.happiness = Math.min(100, window.Clan.currentHappiness(c) + 12);
+                    c.lastInteractedISO = new Date().toISOString();
+                });
+                saveState();
+                navigate("/clan");
+            }
+        });
+    }
+
+    function renderClaim(root) {
+        const cs = clanState();
+        if ((cs.claimTickets || 0) <= 0) {
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Clan</a>
+                <section class="empty">
+                    <p>No tickets yet! Score 100% on any quiz to earn one.</p>
+                </section>
+            `;
+            return;
+        }
+
+        const ownedIds = cs.cats.map(c => c.breedId);
+        const candidates = window.Clan.pickCandidates(ownedIds);
+
+        if (!candidates.length) {
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Clan</a>
+                <section class="empty">
+                    <p>You've collected every breed! Legendary work, Harper. 🌟</p>
+                </section>
+            `;
+            return;
+        }
+
+        const choices = candidates.map(b => {
+            const stats = b.stats;
+            const traitChips = b.traits.map(t => `<span class="trait-chip">${escapeHtml(t)}</span>`).join("");
+            return `
+                <article class="claim-choice" data-breed="${b.id}">
+                    <div class="claim-svg">${window.Cats.breedSvg(b.appearance, "happy")}</div>
+                    <h3>${escapeHtml(b.breed)}</h3>
+                    <p class="claim-archetype">${escapeHtml(b.archetype)}</p>
+                    <p class="claim-origin">📍 ${escapeHtml(b.origin)}</p>
+                    <p class="claim-backstory">${escapeHtml(b.backstory || "")}</p>
+                    <div class="claim-traits">${traitChips}</div>
+                    <ul class="claim-stats">
+                        <li><span>🤗 Cuddly</span> ${renderStatBar(stats.cuddliness)}</li>
+                        <li><span>🪶 Playful</span> ${renderStatBar(stats.playfulness)}</li>
+                        <li><span>🧠 Clever</span> ${renderStatBar(stats.cleverness)}</li>
+                        <li><span>😼 Mischief</span> ${renderStatBar(stats.mischief)}</li>
+                        <li><span>💬 Talkative</span> ${renderStatBar(stats.talk)}</li>
+                    </ul>
+                    <p class="claim-fact">💡 ${escapeHtml(b.funFact)}</p>
+                    <button type="button" class="primary-btn pulse-btn pick-cat-btn">I choose you, ${escapeHtml(b.defaultName)}!</button>
+                </article>
+            `;
+        }).join("");
+
+        root.innerHTML = `
+            <a class="back-link" href="#/clan">← Back to Clan</a>
+            <header class="claim-header">
+                <h1>🎟️ Choose your new cat!</h1>
+                <p>Three cats wandered into your clan. Pick one — the others will scamper off.</p>
+            </header>
+            <section class="claim-grid">${choices}</section>
+        `;
+
+        // Wire pick buttons
+        $$(".pick-cat-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const breedId = btn.closest(".claim-choice").dataset.breed;
+                claimCat(breedId);
+            });
+        });
+    }
+
+    function renderStatBar(value) {
+        const pcts = Math.min(100, Math.max(0, value * 10));
+        return `<span class="stat-bar"><span style="width:${pcts}%"></span></span>`;
+    }
+
+    function claimCat(breedId) {
+        const cs = clanState();
+        if (cs.claimTickets <= 0) return;
+        const breed = window.Clan.findBreed(breedId);
+        if (!breed) return;
+        // Avoid duplicates
+        if (cs.cats.some(c => c.breedId === breedId)) return;
+
+        cs.cats.push({
+            breedId,
+            name: breed.defaultName,
+            dateISO: new Date().toISOString(),
+            lastInteractedISO: new Date().toISOString(),
+            happiness: 80
+        });
+        cs.claimTickets--;
+        saveState();
+
+        // Celebrate!
+        window.Cats.popIn({
+            expression: "cheering",
+            theme: window.Cats.pickTheme(),
+            message: `Welcome to the clan, ${breed.defaultName}!`,
+            duration: 4000, side: "left"
+        });
+        setTimeout(() => window.Cats.popIn({
+            expression: "love",
+            theme: window.Cats.pickTheme(),
+            message: "Your clan grows!",
+            duration: 3500, side: "right"
+        }), 700);
+
+        // Navigate to the new cat's detail page
+        navigate(`/clan/cat/${breedId}`);
+    }
+
+    function renderCatDetail(root, breedId) {
+        const cs = clanState();
+        const cat = cs.cats.find(c => c.breedId === breedId);
+        const breed = window.Clan.findBreed(breedId);
+        if (!cat || !breed) {
+            navigate("/clan");
+            return;
+        }
+        const happy = window.Clan.currentHappiness(cat);
+        const mood = window.Clan.moodFor(happy);
+        const stats = breed.stats;
+        const adoptedDate = new Date(cat.dateISO).toLocaleDateString();
+
+        root.innerHTML = `
+            <a class="back-link" href="#/clan">← Back to Clan</a>
+            <section class="cat-detail">
+                <div class="cat-detail-art">
+                    <div class="cat-detail-svg" id="cat-stage">${window.Cats.breedSvg(breed.appearance, mood.expression)}</div>
+                    <div class="cat-mood-tag mood-${mood.label.toLowerCase()}">${mood.label}</div>
+                </div>
+                <div class="cat-detail-info">
+                    <h1>
+                        <span class="cat-name" id="cat-name">${escapeHtml(cat.name)}</span>
+                        <button type="button" class="link-btn" id="rename-btn">✏️ rename</button>
+                    </h1>
+                    <p class="cat-archetype">${escapeHtml(breed.breed)} · ${escapeHtml(breed.archetype)}</p>
+                    <p class="cat-origin">📍 From ${escapeHtml(breed.origin)} · adopted ${escapeHtml(adoptedDate)}</p>
+                    ${breed.backstory ? `<p class="cat-backstory">📖 ${escapeHtml(breed.backstory)}</p>` : ""}
+
+                    <div class="cat-happiness">
+                        <div class="cat-happiness-label">Happiness <strong id="happiness-num">${happy}%</strong></div>
+                        <div class="cat-happiness-bar"><span id="happiness-bar" style="width:${happy}%"></span></div>
+                    </div>
+
+                    <div class="cat-traits">
+                        ${breed.traits.map(t => `<span class="trait-chip">${escapeHtml(t)}</span>`).join("")}
+                    </div>
+
+                    <ul class="cat-stats">
+                        <li><span>🤗 Cuddly</span> ${renderStatBar(stats.cuddliness)}</li>
+                        <li><span>🪶 Playful</span> ${renderStatBar(stats.playfulness)}</li>
+                        <li><span>🧠 Clever</span> ${renderStatBar(stats.cleverness)}</li>
+                        <li><span>😼 Mischief</span> ${renderStatBar(stats.mischief)}</li>
+                        <li><span>💬 Talkative</span> ${renderStatBar(stats.talk)}</li>
+                    </ul>
+
+                    <p class="cat-funfact">💡 ${escapeHtml(breed.funFact)}</p>
+
+                    <div class="cat-actions">
+                        <button type="button" class="action-btn" data-act="pet">🤚 Pet <span class="boost">+5</span></button>
+                        <button type="button" class="action-btn" data-act="play">🪶 Play <span class="boost">+10</span></button>
+                        <button type="button" class="action-btn" data-act="treat">🐟 Treat <span class="boost">+15</span></button>
+                        <button type="button" class="action-btn" data-act="chat">💬 Chat <span class="boost">+3</span></button>
+                    </div>
+                    <div class="cat-bubble-area" id="cat-bubble-area" aria-live="polite"></div>
+                </div>
+            </section>
+        `;
+
+        // Rename
+        $("#rename-btn").addEventListener("click", () => {
+            const name = prompt("What's their new name?", cat.name);
+            if (name && name.trim()) {
+                cat.name = name.trim().slice(0, 24);
+                saveState();
+                renderCatDetail(root, breedId);
+            }
+        });
+
+        // Interaction handlers
+        $$(".action-btn").forEach(btn => {
+            btn.addEventListener("click", () => doInteraction(btn.dataset.act, breedId, root));
+        });
+    }
+
+    function doInteraction(kind, breedId, root) {
+        const cs = clanState();
+        const cat = cs.cats.find(c => c.breedId === breedId);
+        if (!cat) return;
+        const breed = window.Clan.findBreed(breedId);
+
+        // Apply the boost
+        const boost = { pet: 5, play: 10, treat: 15, chat: 3 }[kind] || 0;
+        cat.happiness = Math.min(100, window.Clan.currentHappiness(cat) + boost);
+        cat.lastInteractedISO = new Date().toISOString();
+        saveState();
+
+        // Pick a phrase
+        const phrase = window.Clan.reactionPhrase(breedId, kind);
+        showCatBubble(phrase);
+
+        // Animate the cat
+        const stage = $("#cat-stage");
+        if (stage) {
+            stage.classList.remove("anim-bounce", "anim-wiggle", "anim-spin", "anim-shake");
+            // Force reflow
+            void stage.offsetWidth;
+            const animMap = { pet: "anim-bounce", play: "anim-spin", treat: "anim-wiggle", chat: "anim-shake" };
+            stage.classList.add(animMap[kind] || "anim-bounce");
+
+            // Swap to a happier expression
+            const expression = kind === "pet" ? "love" : (kind === "play" ? "cheering" : (kind === "treat" ? "happy" : "wave"));
+            stage.innerHTML = window.Cats.breedSvg(breed.appearance, expression);
+
+            // Drift a heart/sparkle up from the cat
+            spawnFloater(stage, kind);
+
+            // Restore mood after a bit
+            setTimeout(() => {
+                const mood = window.Clan.moodFor(window.Clan.currentHappiness(cat));
+                stage.innerHTML = window.Cats.breedSvg(breed.appearance, mood.expression);
+            }, 1400);
+        }
+
+        // Update happiness display
+        const happy = window.Clan.currentHappiness(cat);
+        const num = $("#happiness-num");
+        const bar = $("#happiness-bar");
+        if (num) num.textContent = happy + "%";
+        if (bar) bar.style.width = happy + "%";
+    }
+
+    function showCatBubble(text) {
+        const area = $("#cat-bubble-area");
+        if (!area) return;
+        const id = "bubble-" + Date.now();
+        const div = document.createElement("div");
+        div.className = "cat-speech-bubble";
+        div.id = id;
+        div.textContent = text;
+        area.appendChild(div);
+        // Remove after a bit
+        setTimeout(() => {
+            div.classList.add("leaving");
+            setTimeout(() => div.remove(), 500);
+        }, 2400);
+        // Cap to 3 bubbles
+        while (area.children.length > 3) area.removeChild(area.firstChild);
+    }
+
+    function spawnFloater(stage, kind) {
+        const symbols = { pet: ["💗", "✨", "💕"], play: ["🪶", "✨", "🎯"], treat: ["🐟", "🍣", "✨"], chat: ["💬", "✨"] };
+        const list = symbols[kind] || ["✨"];
+        for (let i = 0; i < 3; i++) {
+            const f = document.createElement("span");
+            f.className = "cat-floater";
+            f.textContent = list[Math.floor(Math.random() * list.length)];
+            f.style.left = (30 + Math.random() * 40) + "%";
+            f.style.animationDelay = (i * 0.15) + "s";
+            stage.appendChild(f);
+            setTimeout(() => f.remove(), 1600);
+        }
+    }
+
     /* ---------- Stats ---------- */
 
     function countAllQuestions(subjectId) {
@@ -894,6 +1598,7 @@
         window.addEventListener("DOMContentLoaded", render);
     }
 
+    generatePracticeExams();
     bindGlobalEvents();
     if (document.readyState !== "loading") render();
 })();

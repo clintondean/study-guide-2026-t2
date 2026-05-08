@@ -1,0 +1,54 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Quick syntax check (data + app)
+        run: |
+          for f in app.js cats.js data/*.js; do
+            node --check "$f"
+          done
+
+      - name: Validate question banks & exam compositions
+        run: node .github/scripts/validate-data.cjs
+
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp -r index.html app.js cats.js styles.css .nojekyll data _site/
+          # Optional: include the handbook directory for reference
+          if [ -d handbook ]; then cp -r handbook _site/; fi
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

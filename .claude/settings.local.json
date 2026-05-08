@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command *)",
+      "PowerShell(python -c \"import pypdf; print\\('pypdf', pypdf.__version__\\)\" 2>&1; python -c \"import PyPDF2; print\\('PyPDF2', PyPDF2.__version__\\)\" 2>&1; python -c \"import fitz; print\\('pymupdf', fitz.__doc__[:50]\\)\" 2>&1; python -c \"import pdfplumber; print\\('pdfplumber', pdfplumber.__version__\\)\" 2>&1)",
+      "PowerShell(Get-Item *)",
+      "PowerShell(python -m pip install --quiet pypdf 2>&1 | Select-Object -Last 5; python -c \"import pypdf; print\\('pypdf', pypdf.__version__\\)\")"
+    ]
+  }
+}

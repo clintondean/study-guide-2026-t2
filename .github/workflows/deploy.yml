@@ -21,21 +21,51 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Quick syntax check (data + app)
+      - name: Quick syntax check (every top-level JS + data)
         run: |
-          for f in app.js cats.js data/*.js; do
+          set -e
+          shopt -s nullglob
+          for f in *.js data/*.js; do
+            echo "Checking $f"
             node --check "$f"
           done
 
       - name: Validate question banks & exam compositions
         run: node .github/scripts/validate-data.cjs
 
+      - name: Verify every <script src="..."> resolves
+        # Fails the build if index.html references a JS file that isn't on disk —
+        # prevents the "404 in production" class of bug when new files are added
+        # but the deploy stages the wrong list.
+        run: |
+          set -e
+          missing=0
+          # Pull every relative src out of index.html (one per line)
+          grep -oE 'src="[^"]+"' index.html | sed 's/src="//;s/"$//' | while read -r src; do
+            case "$src" in
+              http*|//*|data:*) continue ;;
+            esac
+            if [ ! -f "$src" ]; then
+              echo "::error::index.html references missing file: $src"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ]
+
       - name: Stage site
         run: |
+          set -e
+          shopt -s nullglob
           mkdir -p _site
-          cp -r index.html app.js cats.js styles.css .nojekyll data _site/
+          # Top-level static assets — copy every JS, plus the page shell, styles
+          # and required hidden files. Using globs avoids forgetting new files.
+          cp index.html *.js styles.css .nojekyll _site/
+          # Subdirectories needed at runtime
+          cp -r data _site/
           # Optional: include the handbook directory for reference
           if [ -d handbook ]; then cp -r handbook _site/; fi
+          echo "--- staged files ---"
+          find _site -maxdepth 2 -type f | sort
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

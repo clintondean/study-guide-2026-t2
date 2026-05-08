@@ -121,7 +121,10 @@
                 perfectExams: {}     // mode -> true once a 100% has been scored (one ticket per exam)
             },
             breaks: {
-                lastBreakStartISO: null   // when the most recent break STARTED
+                lastBreakStartISO: null,  // when the most recent break STARTED
+                catrisHighScore: 0,       // best Catris score
+                invadersHighScore: 0,     // best Cat Invaders score
+                catanoidHighScore: 0      // best Catanoid score
             }
         };
     }
@@ -197,12 +200,23 @@
         // Stop any park timers if we're leaving the park-play view
         const goingToParkPlay = route[0] === "clan" && route[1] === "park" && route[2] === "play";
         if (!goingToParkPlay && window.Park && window.Park.stop) window.Park.stop();
-        // Stop tetris if leaving break
+        // Going into the break section?
         const goingToBreak = route[0] === "break";
-        if (!goingToBreak && window.CatTetris && window.CatTetris.stop) window.CatTetris.stop();
+        const goingToBreakGame = goingToBreak && route[1];
+        // Stop the currently-running break game (if any) when the route changes —
+        // each game's stop() is idempotent.
+        if (window.CatTetris && window.CatTetris.stop) window.CatTetris.stop();
+        if (window.CatInvaders && window.CatInvaders.stop) window.CatInvaders.stop();
+        if (window.Catanoid && window.Catanoid.stop) window.Catanoid.stop();
+        // If leaving the break section entirely, end the shared session.
+        if (!goingToBreak && window.BreakSession) window.BreakSession.end();
         if (!goingToBreak && window._breakLockoutTimer) {
             clearTimeout(window._breakLockoutTimer);
             window._breakLockoutTimer = null;
+        }
+        if (!goingToBreak && window._breakHubTimer) {
+            clearInterval(window._breakHubTimer);
+            window._breakHubTimer = null;
         }
         root.innerHTML = "";
         root.scrollIntoView({ behavior: "instant", block: "start" });
@@ -211,7 +225,12 @@
         updateClanBadge();
         if (route.length === 0) return renderHome(root);
         if (route[0] === "progress") return renderProgress(root);
-        if (route[0] === "break") return renderBreak(root);
+        if (route[0] === "break") {
+            if (route[1] === "catris") return renderBreakGame(root, "catris");
+            if (route[1] === "invaders") return renderBreakGame(root, "invaders");
+            if (route[1] === "catanoid") return renderBreakGame(root, "catanoid");
+            return renderBreakHub(root);
+        }
         if (route[0] === "clan") {
             if (route[1] === "claim") return renderClaim(root);
             if (route[1] === "park") {
@@ -1160,19 +1179,142 @@
         `;
     }
 
-    /* ---------- Break (cat Tetris) ---------- */
+    /* ---------- Break hub + games ---------- */
 
-    function renderBreak(root) {
+    const BREAK_GAMES = [
+        {
+            id: "catris",
+            name: "Catris",
+            icon: "🐱",
+            blurb: "Stack the kittens. 7 falling tetromino-cats.",
+            color: "#9b5de5",
+            highKey: "catrisHighScore"
+        },
+        {
+            id: "invaders",
+            name: "Cat Invaders",
+            icon: "👾",
+            blurb: "Defend the homeworld from descending alien-cats.",
+            color: "#43aa8b",
+            highKey: "invadersHighScore"
+        },
+        {
+            id: "catanoid",
+            name: "Catanoid",
+            icon: "🧱",
+            blurb: "Bounce the ball, smash the brick-cats.",
+            color: "#ff7f51",
+            highKey: "catanoidHighScore"
+        }
+    ];
+
+    function highScoreFor(gameId) {
+        const game = BREAK_GAMES.find(g => g.id === gameId);
+        if (!game) return 0;
+        return (state.breaks && state.breaks[game.highKey]) || 0;
+    }
+
+    function setHighScoreFor(gameId, score) {
+        const game = BREAK_GAMES.find(g => g.id === gameId);
+        if (!game) return;
+        state.breaks = state.breaks || {};
+        if (score > (state.breaks[game.highKey] || 0)) {
+            state.breaks[game.highKey] = score;
+            saveState();
+            window.Cats.popIn({
+                expression: "cheering",
+                message: "New high score! 🏆",
+                duration: 3000, side: "right"
+            });
+        }
+    }
+
+    function renderBreakHub(root) {
+        // Cooldown still applies to entering the break section
         const remaining = breakCooldownRemaining();
-        if (remaining > 0) {
+        if (remaining > 0 && !window.BreakSession.isActive()) {
             renderBreakLockout(root, remaining);
             return;
         }
-        // Mark this break as started, then hand the root to CatTetris.
-        recordBreakStart();
-        window.CatTetris.start(root, {
-            onExit: () => navigate("/")
-        });
+        // Lazy-start the shared session timer when first arriving at the hub
+        if (!window.BreakSession.isActive()) {
+            recordBreakStart();
+            window.BreakSession.start();
+        }
+        const cards = BREAK_GAMES.map(g => `
+            <a class="break-game-card" href="#/break/${g.id}" style="--accent:${g.color}">
+                <div class="break-game-icon">${g.icon}</div>
+                <h3>${escapeHtml(g.name)}</h3>
+                <p>${escapeHtml(g.blurb)}</p>
+                <div class="break-game-high">🏆 Best: <strong>${highScoreFor(g.id)}</strong></div>
+            </a>
+        `).join("");
+
+        root.innerHTML = `
+            <a class="back-link" href="#/">← Home</a>
+            <header class="break-hub-header">
+                <div>
+                    <h1>☕ Take a break</h1>
+                    <p>Pick a game. The 5-minute timer is shared across all three — switch games freely.</p>
+                </div>
+                <div class="tetris-timer-wrap">
+                    <div class="tetris-timer-label" id="break-hub-label">Time left</div>
+                    <div class="tetris-timer" id="break-hub-timer">5:00</div>
+                </div>
+            </header>
+            <section class="break-hub-grid">${cards}</section>
+            <div class="break-hub-actions">
+                <a class="ghost-btn" href="#/" id="break-hub-end">🚪 End break early</a>
+            </div>
+        `;
+        // Live shared-timer ticker
+        if (window._breakHubTimer) clearInterval(window._breakHubTimer);
+        const tick = () => {
+            const r = window.BreakSession.BREAK_MS - window.BreakSession.elapsed();
+            const elem = document.getElementById("break-hub-timer");
+            const label = document.getElementById("break-hub-label");
+            if (!elem) return;
+            if (r > 0) {
+                const m = Math.floor(r / 60000);
+                const s = Math.floor((r % 60000) / 1000);
+                elem.textContent = `${m}:${String(s).padStart(2, "0")}`;
+                elem.classList.remove("overtime");
+                if (label) label.textContent = "Time left";
+            } else {
+                const ot = -r;
+                const m = Math.floor(ot / 60000);
+                const s = Math.floor((ot % 60000) / 1000);
+                elem.textContent = `+${m}:${String(s).padStart(2, "0")}`;
+                elem.classList.add("overtime");
+                if (label) label.textContent = "Overtime 🔥";
+            }
+        };
+        tick();
+        window._breakHubTimer = setInterval(tick, 500);
+    }
+
+    function renderBreakGame(root, gameId) {
+        // Cooldown enforcement (only when arriving fresh — if a session is
+        // already active, we're switching games and should let through).
+        if (!window.BreakSession.isActive()) {
+            const remaining = breakCooldownRemaining();
+            if (remaining > 0) {
+                renderBreakLockout(root, remaining);
+                return;
+            }
+            recordBreakStart();
+            window.BreakSession.start();
+        }
+        const game = BREAK_GAMES.find(g => g.id === gameId);
+        if (!game) { navigate("/break"); return; }
+        const opts = {
+            onExit: () => navigate("/"),
+            getHighScore: () => highScoreFor(gameId),
+            onHighScore: (score) => setHighScoreFor(gameId, score)
+        };
+        if (gameId === "catris") return window.CatTetris.start(root, opts);
+        if (gameId === "invaders") return window.CatInvaders.start(root, opts);
+        if (gameId === "catanoid") return window.Catanoid.start(root, opts);
     }
 
     function renderBreakLockout(root, remainingMs) {
@@ -1586,16 +1728,84 @@
     /* ---------- Boot ---------- */
 
     function bindGlobalEvents() {
-        $("#reset-progress").addEventListener("click", () => {
-            if (confirm("Reset all your progress? This cannot be undone.")) {
-                state = defaultState();
-                saveState();
-                render();
-                window.Cats.popIn({ expression: "wave", message: "Fresh start — let's go!" });
-            }
-        });
+        $("#reset-progress").addEventListener("click", showResetWarning);
         window.addEventListener("hashchange", render);
         window.addEventListener("DOMContentLoaded", render);
+    }
+
+    function showResetWarning() {
+        // Build a snapshot of what's about to be deleted, so the warning is concrete.
+        const cs = state.clan || { cats: [], claimTickets: 0 };
+        const totalAnswered = state.stats.totalAnswered;
+        const catCount = (cs.cats || []).length;
+        const tickets = cs.claimTickets || 0;
+        const catrisHigh = (state.breaks && state.breaks.catrisHighScore) || 0;
+        const invadersHigh = (state.breaks && state.breaks.invadersHighScore) || 0;
+        const catanoidHigh = (state.breaks && state.breaks.catanoidHighScore) || 0;
+        const highScore = Math.max(catrisHigh, invadersHigh, catanoidHigh);
+        const sessions = SUBJECTS.reduce((n, id) => n + (state.subjects[id].quizSessions || []).length, 0);
+        const namedCats = (cs.cats || []).filter(c => {
+            const breed = window.Clan && window.Clan.findBreed(c.breedId);
+            return breed && c.name && c.name !== breed.defaultName;
+        }).length;
+
+        // Remove any existing modal first
+        const existing = document.getElementById("reset-modal");
+        if (existing) existing.remove();
+
+        const modal = document.createElement("div");
+        modal.id = "reset-modal";
+        modal.className = "reset-modal-overlay";
+        modal.innerHTML = `
+            <div class="reset-modal" role="dialog" aria-labelledby="reset-modal-title" aria-modal="true">
+                <div class="reset-modal-icon">⚠️</div>
+                <h2 id="reset-modal-title">Wait — this wipes EVERYTHING</h2>
+                <p class="reset-modal-lead">Resetting progress is <strong>permanent and cannot be undone</strong>. You'll lose all of the following:</p>
+                <ul class="reset-modal-list">
+                    <li><span>📚</span> <strong>${totalAnswered}</strong> questions answered across ${sessions} quiz session${sessions === 1 ? "" : "s"}</li>
+                    <li><span>🏆</span> Every best score on every Practice Set and Mock Exam</li>
+                    <li><span>🐾</span> Your <strong>${catCount}</strong> cat${catCount === 1 ? "" : "s"}${namedCats ? ` (including <strong>${namedCats}</strong> custom-named ${namedCats === 1 ? "cat" : "cats"})` : ""} and all their happiness</li>
+                    <li><span>🎟️</span> ${tickets} unspent Cat Ticket${tickets === 1 ? "" : "s"}</li>
+                    <li><span>🐱</span> All Catris/Invaders/Catanoid high scores (best: <strong>${highScore}</strong>)</li>
+                    <li><span>🔥</span> Your current and best streaks</li>
+                    <li><span>⏱️</span> Break cooldown timer</li>
+                </ul>
+                <p class="reset-modal-warn">You will need to rebuild your clan from scratch — even cats you adopted weeks ago will be gone forever.</p>
+                <label class="reset-modal-confirm">
+                    <input type="checkbox" id="reset-modal-check">
+                    <span>I understand this cannot be undone, and I want to delete everything.</span>
+                </label>
+                <div class="reset-modal-actions">
+                    <button type="button" class="ghost-btn" id="reset-modal-cancel">Cancel — keep my progress</button>
+                    <button type="button" class="reset-modal-go" id="reset-modal-confirm" disabled>Yes, reset everything</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const checkBox = document.getElementById("reset-modal-check");
+        const goBtn = document.getElementById("reset-modal-confirm");
+        checkBox.addEventListener("change", () => {
+            goBtn.disabled = !checkBox.checked;
+        });
+        document.getElementById("reset-modal-cancel").addEventListener("click", closeResetModal);
+        modal.addEventListener("click", (e) => { if (e.target === modal) closeResetModal(); });
+        goBtn.addEventListener("click", () => {
+            // Final native confirm for the rare double-click misclickers
+            if (!confirm("Last chance — really delete every cat, every score, and start over?")) return;
+            state = defaultState();
+            saveState();
+            closeResetModal();
+            render();
+            window.Cats.popIn({ expression: "wave", message: "Fresh start — let's go!", duration: 3000 });
+        });
+        // Focus the cancel button for safety
+        setTimeout(() => document.getElementById("reset-modal-cancel").focus(), 50);
+    }
+
+    function closeResetModal() {
+        const m = document.getElementById("reset-modal");
+        if (m) m.remove();
     }
 
     generatePracticeExams();

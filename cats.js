@@ -498,9 +498,133 @@
     <text x="155" y="40" font-size="20" class="float-heart-r">💗</text>`;
     }
 
+    /* =========================================================
+       tetrisFace — small head-only cat that fits in a Tetris cell.
+       Uses the same breed-appearance schema as breedSvg.
+       ========================================================= */
+    function tetrisFace(appearance) {
+        const a = Object.assign({
+            primary: "#f4a261", secondary: "#ffd9b3", accent: "#e07a3a",
+            eyeColor: "#2a8a3a",
+            pattern: "stripes", fluff: "medium", earStyle: "normal",
+            noseColor: "#ff8da1"
+        }, appearance || {});
+        const inner = "#ffb3c1";
+        const fluffOutline = a.fluff === "long"
+            ? `<circle cx="50" cy="58" r="48" fill="${a.primary}" opacity="0.55"/>`
+            : "";
+        const ears = (function (style) {
+            if (style === "folded") {
+                return `
+        <path d="M 18 45 L 28 25 L 44 42 Q 32 50 18 45 Z" fill="${a.primary}"/>
+        <path d="M 82 45 L 72 25 L 56 42 Q 68 50 82 45 Z" fill="${a.primary}"/>
+        <path d="M 26 36 Q 32 42 40 42" stroke="${inner}" stroke-width="1.6" fill="none"/>
+        <path d="M 74 36 Q 68 42 60 42" stroke="${inner}" stroke-width="1.6" fill="none"/>`;
+            }
+            if (style === "tufted") {
+                return `
+        <polygon points="18,46 28,8 44,42" fill="${a.primary}"/>
+        <polygon points="82,46 72,8 56,42" fill="${a.primary}"/>
+        <polygon points="25,38 30,18 38,38" fill="${inner}"/>
+        <polygon points="75,38 70,18 62,38" fill="${inner}"/>
+        <path d="M 28 8 Q 24 0 28 -6" stroke="${a.primary}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M 33 8 Q 36 0 40 -2" stroke="${a.primary}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M 72 8 Q 76 0 72 -6" stroke="${a.primary}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M 67 8 Q 64 0 60 -2" stroke="${a.primary}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
+            }
+            if (style === "big") {
+                return `
+        <polygon points="14,48 24,-2 48,42" fill="${a.primary}"/>
+        <polygon points="86,48 76,-2 52,42" fill="${a.primary}"/>
+        <polygon points="22,40 26,8 40,38" fill="${inner}"/>
+        <polygon points="78,40 74,8 60,38" fill="${inner}"/>`;
+            }
+            if (style === "small") {
+                return `
+        <polygon points="22,46 30,28 42,42" fill="${a.primary}"/>
+        <polygon points="78,46 70,28 58,42" fill="${a.primary}"/>
+        <polygon points="28,40 30,32 36,40" fill="${inner}"/>
+        <polygon points="72,40 70,32 64,40" fill="${inner}"/>`;
+            }
+            if (style === "curl") {
+                return `
+        <path d="M 18 45 Q 16 14 36 18 Q 40 30 44 42 Q 28 50 18 45 Z" fill="${a.primary}"/>
+        <path d="M 82 45 Q 84 14 64 18 Q 60 30 56 42 Q 72 50 82 45 Z" fill="${a.primary}"/>
+        <path d="M 26 38 Q 32 28 40 38" stroke="${inner}" stroke-width="1.6" fill="none"/>
+        <path d="M 74 38 Q 68 28 60 38" stroke="${inner}" stroke-width="1.6" fill="none"/>`;
+            }
+            // normal
+            return `
+        <polygon points="18,46 28,10 44,42" fill="${a.primary}"/>
+        <polygon points="82,46 72,10 56,42" fill="${a.primary}"/>
+        <polygon points="25,38 30,18 38,38" fill="${inner}"/>
+        <polygon points="75,38 70,18 62,38" fill="${inner}"/>`;
+        })(a.earStyle);
+
+        const pattern = (function (p) {
+            if (p === "stripes") {
+                return `
+        <path d="M 30 32 Q 35 24 40 32" stroke="${a.accent}" stroke-width="2.4" fill="none"/>
+        <path d="M 60 32 Q 65 24 70 32" stroke="${a.accent}" stroke-width="2.4" fill="none"/>
+        <path d="M 45 24 Q 50 16 55 24" stroke="${a.accent}" stroke-width="2.4" fill="none"/>`;
+            }
+            if (p === "tuxedo") {
+                return `
+        <ellipse cx="50" cy="62" rx="13" ry="9" fill="#fff"/>`;
+            }
+            if (p === "calico") {
+                const c1 = a.calicoColors ? a.calicoColors[0] : "#f4a261";
+                const c2 = a.calicoColors ? a.calicoColors[1] : "#2f2f33";
+                return `
+        <path d="M 16 32 Q 30 22 44 34 Q 38 50 24 48 Q 12 42 16 32 Z" fill="${c1}"/>
+        <path d="M 60 26 Q 80 28 84 50 Q 70 54 60 46 Q 52 38 60 26 Z" fill="${c2}"/>`;
+            }
+            if (p === "tortie") {
+                const orange = "#f4a261";
+                return `
+        <path d="M 22 42 Q 32 34 42 46 Q 32 52 22 42 Z" fill="${orange}" opacity="0.85"/>
+        <path d="M 60 30 Q 76 32 78 50 Q 65 54 60 30 Z" fill="${orange}" opacity="0.85"/>`;
+            }
+            if (p === "points") {
+                return `
+        <ellipse cx="50" cy="64" rx="20" ry="14" fill="${a.accent}" opacity="0.55"/>
+        <polygon points="18,46 26,10 42,42" fill="${a.accent}" opacity="0.6"/>
+        <polygon points="82,46 74,10 58,42" fill="${a.accent}" opacity="0.6"/>`;
+            }
+            if (p === "spots") {
+                return `
+        <circle cx="32" cy="44" r="3.2" fill="${a.accent}"/>
+        <circle cx="42" cy="34" r="2.8" fill="${a.accent}"/>
+        <circle cx="58" cy="34" r="2.8" fill="${a.accent}"/>
+        <circle cx="68" cy="44" r="3.2" fill="${a.accent}"/>
+        <circle cx="38" cy="78" r="3" fill="${a.accent}"/>
+        <circle cx="62" cy="78" r="3" fill="${a.accent}"/>`;
+            }
+            return ""; // solid
+        })(a.pattern);
+
+        return `<svg viewBox="0 0 100 100" class="tetris-cat-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            ${fluffOutline}
+            ${ears}
+            <circle cx="50" cy="55" r="38" fill="${a.primary}"/>
+            ${pattern}
+            <ellipse cx="38" cy="51" rx="5" ry="6" fill="${a.eyeColor}"/>
+            <ellipse cx="62" cy="51" rx="5" ry="6" fill="${a.eyeColor}"/>
+            <ellipse cx="38" cy="51" rx="2" ry="5" fill="#1a1a1d"/>
+            <ellipse cx="62" cy="51" rx="2" ry="5" fill="#1a1a1d"/>
+            <circle cx="40" cy="49" r="1.4" fill="#fff"/>
+            <circle cx="64" cy="49" r="1.4" fill="#fff"/>
+            <path d="M 46 60 L 54 60 L 50 66 Z" fill="${a.noseColor}"/>
+            <path d="M 42 70 Q 50 76 58 70" stroke="rgba(0,0,0,0.7)" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+            <line x1="20" y1="62" x2="38" y2="62" stroke="rgba(0,0,0,0.4)" stroke-width="0.8"/>
+            <line x1="62" y1="62" x2="80" y2="62" stroke="rgba(0,0,0,0.4)" stroke-width="0.8"/>
+        </svg>`;
+    }
+
     window.Cats = {
         svg,
         breedSvg,
+        tetrisFace,
         popIn,
         celebrate,
         phrases: PHRASES,

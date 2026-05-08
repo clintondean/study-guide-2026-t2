@@ -1,13 +1,52 @@
-// "I've earned a break" — a 5-minute cat-themed Tetris.
-// Standard 7-piece Tetris with cat-coloured cells.
+// Catris — "I've earned a break". A 5-minute cat-themed Tetris.
+// Standard 7-piece Tetris with cat-coloured cells. Each tile shows a tiny
+// SVG cat face (works reliably across browsers/OS, unlike emoji).
 // Exposes window.CatTetris.
+
+// Each piece type renders as a different cat breed face (rendered via
+// Cats.tetrisFace using the same breed-appearance schema as the clan).
+const TETRIS_PIECE_BREEDS = {
+    // I (teal block): MAINE COON — long fluff, tufted ears, brown stripes
+    I: { primary: "#7d5a3c", secondary: "#d8b48a", accent: "#3a2818", eyeColor: "#f0a500",
+         pattern: "stripes", fluff: "long", earStyle: "tufted" },
+    // O (yellow block): PERSIAN — long fluffy cream, small ears
+    O: { primary: "#f0e5d5", secondary: "#fff8ec", accent: "#c8b59a", eyeColor: "#f0a500",
+         pattern: "solid", fluff: "long", earStyle: "small" },
+    // T (purple block): SIAMESE — points (dark face/ears), big ears
+    T: { primary: "#f4ecd8", secondary: "#fff8e7", accent: "#5a3a22", eyeColor: "#3da9fc",
+         pattern: "points", fluff: "short", earStyle: "big" },
+    // S (mint block): RUSSIAN BLUE — solid grey, normal ears
+    S: { primary: "#8aa1b6", secondary: "#c2cfd9", accent: "#5b6c7c", eyeColor: "#4ed4a3",
+         pattern: "solid", fluff: "short", earStyle: "normal" },
+    // Z (red-orange block): CALICO — patches, normal ears
+    Z: { primary: "#fff", secondary: "#fff", accent: "#2f2f33", eyeColor: "#f0a500",
+         pattern: "calico", fluff: "medium", earStyle: "normal",
+         calicoColors: ["#f4a261", "#2f2f33"] },
+    // L (orange block): BENGAL — spots, normal ears
+    L: { primary: "#d6a361", secondary: "#f0d4a4", accent: "#3a2818", eyeColor: "#5fcfbf",
+         pattern: "spots", fluff: "short", earStyle: "normal" },
+    // J (blue block): SPHYNX — hairless pink, big ears
+    J: { primary: "#f0c8b4", secondary: "#fad7c4", accent: "#c89882", eyeColor: "#3da9fc",
+         pattern: "solid", fluff: "hairless", earStyle: "big" }
+};
+function getCatFaceSvg(key) {
+    const breed = TETRIS_PIECE_BREEDS[key];
+    return (window.Cats && window.Cats.tetrisFace)
+        ? window.Cats.tetrisFace(breed)
+        : "";
+}
 
 (function () {
     "use strict";
 
     const COLS = 10;
     const ROWS = 20;
-    const BREAK_MS = 5 * 60 * 1000;        // 5-minute session cap
+    // The 5-minute timer is shared across all break games (Catris, Cat
+    // Invaders, Catanoid). Switching games keeps the same session timer.
+    const SESSION = (typeof window !== "undefined" && window.BreakSession) || {
+        BREAK_MS: 5 * 60 * 1000, start() {}, end() {}, elapsed: () => 0
+    };
+    const BREAK_MS = SESSION.BREAK_MS;
 
     // Pieces with their 4 rotations (max 4×4 cells each, 1 = filled)
     // Each piece type has a colour theme + cat emoji rendered in cells.
@@ -78,16 +117,31 @@
     };
     const PIECE_KEYS = Object.keys(PIECES);
 
-    let state;       // { grid, current, next, score, lines, level, gameOver, paused, startedAt, dropTimer, keyHandler }
+    let state;       // { grid, current, next, score, lines, level, gameOver, paused, dropTimer, keyHandler, ... }
     let rootEl;
     let onExit = null;
-
+    let onHighScore = null;
+    let getHighScore = () => 0;
     /* ---------- Public ---------- */
 
     function start(root, opts) {
         opts = opts || {};
         rootEl = root;
         onExit = opts.onExit || null;
+        onHighScore = opts.onHighScore || null;     // called with new high score when set
+        getHighScore = opts.getHighScore || (() => 0);
+        // The shared break session is started by the hub, but make sure it's running.
+        SESSION.start();
+        beginNewGame();
+    }
+
+    function beginNewGame() {
+        // Tear down any running game without touching sessionStartedAt
+        if (state) {
+            if (state.dropTimer) clearTimeout(state.dropTimer);
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            if (state.keyHandler) window.removeEventListener("keydown", state.keyHandler);
+        }
         state = freshState();
         renderShell();
         bindKeys();
@@ -103,6 +157,8 @@
         if (state.timerInterval) clearInterval(state.timerInterval);
         if (state.keyHandler) window.removeEventListener("keydown", state.keyHandler);
         state = null;
+        // NOTE: do NOT end the shared session here — the user might switch to
+        // another break game. The hub controls when to end the session.
     }
 
     /* ---------- State ---------- */
@@ -119,7 +175,7 @@
             level: 1,
             gameOver: false,
             paused: false,
-            startedAt: Date.now()
+            timeExpired: false
         };
     }
 
@@ -272,32 +328,28 @@
 
     /* ---------- Time ---------- */
 
-    function elapsedMs() { return Date.now() - state.startedAt; }
-    function remainingMs() { return Math.max(0, BREAK_MS - elapsedMs()); }
-
-    function timeUp() {
-        state.gameOver = true;
-        if (state.dropTimer) clearTimeout(state.dropTimer);
-        renderAll();
-    }
+    function elapsedMs() { return SESSION.elapsed(); }
+    // Soft target: returns negative when the cap has been exceeded (overtime).
+    function remainingMs() { return BREAK_MS - elapsedMs(); }
 
     /* ---------- Render ---------- */
 
     function renderShell() {
         rootEl.innerHTML = `
-            <a class="back-link" id="tetris-back" href="#/">← Home</a>
+            <a class="back-link" id="tetris-back" href="#/break">← Switch game</a>
             <header class="tetris-header">
                 <div>
-                    <h1>☕ I've earned a break</h1>
-                    <p class="tetris-blurb">5-minute cat-Tetris. Every piece is a kitten waiting to land.</p>
+                    <h1>🐱 Catris</h1>
+                    <p class="tetris-blurb">5-minute kitten-stacker. Timer is shared across all break games.</p>
                 </div>
                 <div class="tetris-timer-wrap">
-                    <div class="tetris-timer-label">Time left</div>
+                    <div class="tetris-timer-label" id="tetris-timer-label">Time left</div>
                     <div class="tetris-timer" id="tetris-timer">5:00</div>
                 </div>
             </header>
             <div class="tetris-layout">
                 <aside class="tetris-side">
+                    <div class="tetris-stat tetris-highscore"><span>🏆 High score</span><strong id="tetris-highscore">${getHighScore() || 0}</strong></div>
                     <div class="tetris-stat"><span>Score</span><strong id="tetris-score">0</strong></div>
                     <div class="tetris-stat"><span>Lines</span><strong id="tetris-lines">0</strong></div>
                     <div class="tetris-stat"><span>Level</span><strong id="tetris-level">1</strong></div>
@@ -411,6 +463,7 @@
         cell.classList.add(`piece-${key}`);
         if (isCurrent) cell.classList.add("current");
         cell.style.background = piece.color;
+        cell.innerHTML = getCatFaceSvg(key);
     }
 
     function renderNextPreview() {
@@ -429,6 +482,7 @@
                 if (matrix[i][j]) {
                     c.classList.add("filled");
                     c.style.background = PIECES[key].color;
+                    c.innerHTML = getCatFaceSvg(key);
                 }
                 wrap.appendChild(c);
             }
@@ -438,12 +492,33 @@
     function renderTimer() {
         if (!state) return;
         const r = remainingMs();
-        const m = Math.floor(r / 60000);
-        const s = Math.floor((r % 60000) / 1000);
         const elem = document.getElementById("tetris-timer");
-        if (elem) elem.textContent = `${m}:${String(s).padStart(2, "0")}`;
-        if (r === 0 && !state.gameOver) {
-            timeUp();
+        const labelEl = document.getElementById("tetris-timer-label");
+        if (!elem) return;
+        if (r > 0) {
+            const m = Math.floor(r / 60000);
+            const s = Math.floor((r % 60000) / 1000);
+            elem.textContent = `${m}:${String(s).padStart(2, "0")}`;
+            elem.classList.remove("overtime");
+            if (labelEl) labelEl.textContent = "Time left";
+        } else {
+            // Overtime — keep playing! The game only ends when Harper tops out.
+            if (!state.timeExpired) {
+                state.timeExpired = true;
+                if (window.Cats && !state.gameOver) {
+                    window.Cats.popIn({
+                        expression: "cheering",
+                        message: "OVERTIME! Keep stacking!",
+                        duration: 3000, side: "right"
+                    });
+                }
+            }
+            const overtimeMs = -r;
+            const m = Math.floor(overtimeMs / 60000);
+            const s = Math.floor((overtimeMs % 60000) / 1000);
+            elem.textContent = `+${m}:${String(s).padStart(2, "0")}`;
+            elem.classList.add("overtime");
+            if (labelEl) labelEl.textContent = "Overtime 🔥";
         }
     }
 
@@ -458,22 +533,35 @@
         if (state.gameOver) {
             const isTimeUp = remainingMs() === 0;
             ov.hidden = false;
-            const headline = isTimeUp ? "Break time's up!" : "Stack reached the top!";
+            const previousHigh = getHighScore() || 0;
+            const isNewHigh = state.score > previousHigh;
+            // Persist new high score (idempotent — onHighScore can no-op if already saved)
+            if (isNewHigh && typeof onHighScore === "function" && !state._highSaved) {
+                state._highSaved = true;
+                onHighScore(state.score);
+            }
+            const headline = isNewHigh
+                ? "🏆 NEW HIGH SCORE!"
+                : (isTimeUp ? "Break time's up!" : "Stack reached the top!");
             ov.innerHTML = `
-                <div class="overlay-card">
+                <div class="overlay-card ${isNewHigh ? "is-new-high" : ""}">
                     <h2>${headline}</h2>
                     <p>Final score: <strong>${state.score}</strong></p>
                     <p>Lines cleared: <strong>${state.lines}</strong> · Level <strong>${state.level}</strong></p>
+                    <p class="tetris-prev-high">Previous best: ${previousHigh}</p>
                     <div class="overlay-actions">
                         <button type="button" id="tetris-again" class="primary-btn pulse-btn">🔁 Play again</button>
                         <a class="ghost-btn" href="#/">← Back to study</a>
                     </div>
                 </div>
             `;
+            // Update the on-screen high-score chip
+            const hsEl = document.getElementById("tetris-highscore");
+            if (hsEl) hsEl.textContent = Math.max(previousHigh, state.score);
             const again = document.getElementById("tetris-again");
             if (again) again.addEventListener("click", () => {
-                stop();
-                start(rootEl, { onExit });
+                // Reset the GAME but keep the break-session timer running.
+                beginNewGame();
             });
             return;
         }

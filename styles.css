@@ -1776,6 +1776,334 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 .tetris-stat span { font-size: 0.8rem; color: var(--text-muted); }
 .tetris-stat strong { font-size: 1.2rem; color: var(--accent); }
 
+.tetris-stat.tetris-highscore {
+    background: linear-gradient(135deg, #ffe88a, #ff7f51);
+    color: #2a1d12;
+}
+.tetris-stat.tetris-highscore span,
+.tetris-stat.tetris-highscore strong {
+    color: #2a1d12;
+}
+.tetris-stat.tetris-highscore strong {
+    font-weight: 800;
+}
+
+.overlay-card.is-new-high {
+    border: 2px solid #ff7f51;
+    box-shadow: 0 0 0 3px #ffe88a, var(--shadow-strong);
+    animation: highBounce 700ms cubic-bezier(.2,.8,.2,1.2);
+}
+@keyframes highBounce {
+    from { transform: scale(0.6) rotate(-4deg); opacity: 0; }
+    to { transform: scale(1) rotate(0); opacity: 1; }
+}
+.overlay-card.is-new-high h2 {
+    color: #ff7f51;
+    text-shadow: 0 2px 0 #ffe88a;
+}
+.tetris-prev-high {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* ============== Reset progress warning modal ============== */
+
+.reset-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 10, 25, 0.78);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: rmFade 200ms ease;
+}
+@keyframes rmFade { from { opacity: 0; } to { opacity: 1; } }
+
+.reset-modal {
+    background: var(--surface);
+    color: var(--text);
+    border: 3px solid var(--bad);
+    border-radius: var(--radius-lg);
+    padding: 1.4rem 1.5rem 1.2rem;
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    text-align: left;
+    animation: rmPop 250ms cubic-bezier(.2,.8,.2,1.15);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+@keyframes rmPop {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.reset-modal-icon {
+    font-size: 3rem;
+    text-align: center;
+    line-height: 1;
+    animation: rmShake 0.7s ease;
+}
+@keyframes rmShake {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-12deg); }
+    75% { transform: rotate(12deg); }
+}
+
+.reset-modal h2 {
+    color: var(--bad);
+    font-size: 1.35rem;
+    text-align: center;
+    margin: 0.2rem 0 0.6rem;
+}
+
+.reset-modal-lead {
+    color: var(--text);
+    font-size: 0.95rem;
+    margin-bottom: 0.7rem;
+}
+
+.reset-modal-list {
+    background: var(--bad-soft);
+    border-radius: var(--radius);
+    padding: 0.7rem 1rem 0.7rem 1rem;
+    list-style: none;
+    margin-bottom: 0.8rem;
+}
+.reset-modal-list li {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.92rem;
+    color: var(--text);
+}
+.reset-modal-list li span {
+    font-size: 1.2rem;
+    text-align: center;
+}
+.reset-modal-list strong { color: var(--bad); }
+
+.reset-modal-warn {
+    background: linear-gradient(135deg, var(--bad-soft), var(--bad-soft));
+    color: var(--bad);
+    font-weight: 600;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius);
+    border-left: 4px solid var(--bad);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.reset-modal-confirm {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.7rem 0.9rem;
+    background: var(--surface-soft);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    margin-bottom: 0.9rem;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.reset-modal-confirm:hover { border-color: var(--bad); }
+.reset-modal-confirm input {
+    width: 22px; height: 22px;
+    accent-color: var(--bad);
+    flex-shrink: 0;
+    margin-top: 1px;
+    cursor: pointer;
+}
+.reset-modal-confirm span {
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+.reset-modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.reset-modal-actions .ghost-btn {
+    flex: 1;
+    min-width: 180px;
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: 700;
+}
+.reset-modal-actions .ghost-btn:hover { background: var(--accent-hover, var(--accent)); }
+
+.reset-modal-go {
+    flex: 1;
+    min-width: 180px;
+    background: var(--bad);
+    color: white;
+    border: 2px solid var(--bad);
+    border-radius: var(--radius-pill);
+    padding: 0.6rem 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.reset-modal-go:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.reset-modal-go:not(:disabled):hover { transform: translateY(-1px); }
+
+@media (max-width: 480px) {
+    .reset-modal { padding: 1rem; }
+    .reset-modal h2 { font-size: 1.15rem; }
+    .reset-modal-actions .ghost-btn,
+    .reset-modal-go { min-width: 100%; }
+}
+
+/* ============== Take a break — hub ============== */
+
+.break-hub-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, #9b5de5 12%, var(--surface)) 100%);
+    border: 1px solid var(--border);
+    padding: 1.2rem 1.4rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.break-hub-header h1 { font-size: 1.7rem; }
+.break-hub-header p { color: var(--text-muted); font-size: 0.92rem; margin-top: 0.3rem; max-width: 520px; }
+
+.break-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+}
+
+.break-game-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.4rem;
+    color: var(--text);
+    text-decoration: none;
+    transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    border-top: 6px solid var(--accent);
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.break-game-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-strong);
+    text-decoration: none;
+}
+
+.break-game-icon { font-size: 3rem; line-height: 1; }
+.break-game-card h3 { font-size: 1.3rem; }
+.break-game-card p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.4; }
+
+.break-game-high {
+    margin-top: auto;
+    padding-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+.break-game-high strong { color: var(--accent); font-size: 1.05rem; }
+
+.break-hub-actions {
+    text-align: center;
+    margin-top: 0.8rem;
+}
+
+/* ----- Cat Invaders / Catanoid game shell ----- */
+
+.break-game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, #43aa8b 8%, var(--surface)) 100%);
+    border: 1px solid var(--border);
+    padding: 1rem 1.4rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 0.8rem;
+    box-shadow: var(--shadow);
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+.break-game-header h1 { font-size: 1.5rem; }
+.break-game-blurb { color: var(--text-muted); font-size: 0.88rem; margin-top: 0.2rem; }
+
+.break-game-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+
+.break-canvas-wrap {
+    position: relative;
+    background: linear-gradient(135deg, #2a2630, #1a1620);
+    padding: 8px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-strong), inset 0 0 0 2px rgba(255,255,255,0.08);
+    width: fit-content;
+    margin: 0 auto;
+    max-width: 100%;
+}
+.break-canvas-wrap canvas {
+    display: block;
+    border-radius: var(--radius);
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    background: #0e0a1c;
+}
+
+.break-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 15, 18, 0.85);
+    border-radius: var(--radius-lg);
+    color: white;
+}
+.break-overlay[hidden] { display: none !important; }
+
+.break-touch {
+    margin: 0.5rem auto 0;
+    max-width: 360px;
+}
+.break-touch button { min-width: 80px; }
+
+.break-help {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+}
+
+@media (max-width: 720px) {
+    .break-canvas-wrap { padding: 4px; }
+    .break-game-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
 .tetris-next-label { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.3rem; }
 .tetris-next-cell {
     display: grid;
@@ -1860,51 +2188,100 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 
 .tetris-board-wrap {
     position: relative;
-    background: #2a2630;
-    padding: 8px;
+    background: linear-gradient(135deg, #fff5ec, #ffd9b3);
+    padding: 10px;
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-strong), inset 0 0 0 2px rgba(255,255,255,0.08);
+    box-shadow: var(--shadow-strong), inset 0 0 0 3px rgba(255, 127, 81, 0.4);
+    /* Shrink to the grid (don't stretch across the centre column) */
+    width: fit-content;
+    justify-self: center;
+    align-self: start;
 }
 
 .tetris-grid {
+    --cell: 30px;
     display: grid;
-    grid-template-columns: repeat(var(--cols, 10), 1fr);
-    grid-template-rows: repeat(var(--rows, 20), 1fr);
+    grid-template-columns: repeat(var(--cols, 10), var(--cell));
+    grid-template-rows: repeat(var(--rows, 20), var(--cell));
     gap: 2px;
-    width: 320px;
-    aspect-ratio: 10 / 20;
-    background: #1d1a24;
+    /* Bright playfield so empty cells (and blocks!) are vibrant */
+    background: #fffaf2;
     border-radius: var(--radius);
     overflow: hidden;
-    padding: 2px;
+    padding: 4px;
+    box-shadow: inset 0 2px 6px rgba(206, 66, 87, 0.18);
 }
 
 @media (max-width: 880px) {
-    .tetris-grid { width: 280px; }
+    .tetris-grid { --cell: 26px; }
+}
+@media (max-width: 480px) {
+    .tetris-grid { --cell: 22px; }
 }
 
 .tetris-grid.flash { animation: tflash 0.28s ease; }
-@keyframes tflash { 50% { box-shadow: 0 0 0 8px rgba(255, 209, 102, 0.6); } }
+@keyframes tflash { 50% { box-shadow: 0 0 0 8px rgba(255, 209, 102, 0.85); } }
 
 .tetris-cell {
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 3px;
+    /* Light, clearly visible empty cells */
+    background: #f1e4d3;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(206, 66, 87, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
 }
 .tetris-cell.filled {
-    border-radius: 4px;
-    /* Subtle 3D bevel: light highlight top-left, darker on bottom-right.
-       The block's main fill comes from the inline `background`. */
+    border-radius: 5px;
+    /* Bright 3D bevel: bigger highlight + crisper shadow against the light board */
     box-shadow:
-        inset 2px 2px 0 rgba(255, 255, 255, 0.45),
-        inset -2px -2px 0 rgba(0, 0, 0, 0.30),
-        0 0 0 1px rgba(0, 0, 0, 0.25);
+        inset 3px 3px 0 rgba(255, 255, 255, 0.55),
+        inset -3px -3px 0 rgba(0, 0, 0, 0.18),
+        0 1px 2px rgba(0, 0, 0, 0.18);
+    /* color = the dark silhouette colour for the cat-face SVG */
+    color: rgba(40, 20, 60, 0.85);
 }
 .tetris-cell.current {
     box-shadow:
-        inset 2px 2px 0 rgba(255, 255, 255, 0.55),
-        inset -2px -2px 0 rgba(0, 0, 0, 0.30),
-        0 0 0 1px rgba(255, 255, 255, 0.6);
+        inset 3px 3px 0 rgba(255, 255, 255, 0.7),
+        inset -3px -3px 0 rgba(0, 0, 0, 0.18),
+        0 0 0 2px #fff,
+        0 0 0 4px rgba(255, 127, 81, 0.7);
 }
+
+/* Cat face inside the block */
+.tetris-cat-svg {
+    width: 88%;
+    height: 88%;
+    display: block;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.6));
+}
+
+/* Per-piece face shade — subtle variation on the dark silhouette */
+.tetris-cell.piece-O { color: rgba(60, 30, 0, 0.85); }
+.tetris-cell.piece-I { color: rgba(0, 40, 40, 0.85); }
+.tetris-cell.piece-S { color: rgba(0, 50, 50, 0.85); }
+.tetris-cell.piece-Z { color: rgba(60, 0, 10, 0.85); }
+.tetris-cell.piece-T { color: rgba(40, 10, 60, 0.85); }
+.tetris-cell.piece-L { color: rgba(60, 30, 0, 0.85); }
+.tetris-cell.piece-J { color: rgba(0, 30, 60, 0.85); }
+
+.tetris-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(40, 20, 60, 0.85);
+    border-radius: 4px;
+}
+.tetris-mini.filled {
+    box-shadow:
+        inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.55),
+        inset -1.5px -1.5px 0 rgba(0, 0, 0, 0.20),
+        0 0 0 1px rgba(0, 0, 0, 0.10);
+}
+.tetris-mini .tetris-cat-svg { width: 82%; height: 82%; }
 
 .tetris-overlay {
     position: absolute;
@@ -1916,6 +2293,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     border-radius: var(--radius-lg);
     color: white;
 }
+/* `display: flex` above otherwise overrides the HTML `hidden` attribute. */
+.tetris-overlay[hidden] { display: none !important; }
 .overlay-card {
     background: var(--surface);
     color: var(--text);

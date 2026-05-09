@@ -2013,6 +2013,12 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 .ai-btn:hover { transform: translateY(-1px); }
 .ai-btn:disabled { opacity: 0.6; cursor: wait; }
+.ai-btn.ai-btn-needs-key {
+    background: var(--surface);
+    color: var(--accent);
+    border: 1px dashed var(--accent);
+}
+.ai-btn.ai-btn-needs-key:hover { background: var(--accent-soft); }
 
 .ai-feedback-card {
     margin: 0.6rem 0;

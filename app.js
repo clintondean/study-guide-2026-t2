@@ -636,7 +636,8 @@
         const k = keyOf(q);
         const apiKey = (state.settings && state.settings.geminiApiKey) || "";
         if (!apiKey) {
-            alert("Add a Gemini API key in Settings to enable AI marking.");
+            const go = confirm("AI marking needs a free Google Gemini API key.\n\nGet one at aistudio.google.com/apikey, then paste it into Settings.\n\nOpen Settings now?");
+            if (go) navigate("/settings");
             return;
         }
         const userText = (session.answers[k] && session.answers[k].userText) || "";
@@ -899,13 +900,19 @@
             const ro = isLocked ? "readonly" : "";
             const aiKey = (state.settings && state.settings.geminiApiKey) || "";
             const ai = previous && previous.aiFeedback;
+            // Always show the AI button on practice written questions so the
+            // user can see at a glance that AI marking is available — clicking
+            // it without a saved key sends them to Settings.
+            const aiBtnLabel = aiKey
+                ? (ai ? "🤖 Re-mark with AI" : "🤖 Get AI feedback")
+                : "🤖 Set up AI marking";
             area.innerHTML = `
                 <textarea id="written-answer" rows="${type === "long" ? 12 : 6}" ${ro} placeholder="${session.isMock ? "Type your response. Once you press Next it will be locked." : "Plan and write your response here. (Saved automatically.)"}">${escapeHtml(value)}</textarea>
                 ${session.isMock ? `` : `
                     <div class="written-actions">
                         <button type="button" class="ghost-btn" id="reveal-sample">${showSample ? "Hide" : "Show"} sample answer</button>
                         <button type="button" class="ghost-btn" id="self-correct">${previous && previous.correct ? "Marked correct ✓" : "I got this right"}</button>
-                        ${aiKey ? `<button type="button" class="ai-btn" id="ai-mark-btn">🤖 ${ai ? "Re-mark" : "Get AI feedback"}</button>` : ""}
+                        <button type="button" class="ai-btn ${aiKey ? "" : "ai-btn-needs-key"}" id="ai-mark-btn">${aiBtnLabel}</button>
                     </div>
                     ${ai ? renderAIFeedback(ai, q.marks) : ""}
                     <div class="sample" id="sample-block" ${showSample ? "" : "hidden"}>

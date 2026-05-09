@@ -138,13 +138,32 @@
         if (!apiKey) throw new Error("No Gemini API key. Add one in Settings.");
         const model = await discoverModel(apiKey);
         const prompt = buildMarkingPrompt(opts);
+        const marks = opts.marks || 4;
         const body = {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
                 responseMimeType: "application/json",
+                // Strict schema = the model returns valid JSON instead of free
+                // text we have to coax. Cuts truncation problems dramatically.
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        assessment: { type: "STRING", enum: ["correct", "partial", "incorrect"] },
+                        suggestedMark: { type: "INTEGER" },
+                        feedback: { type: "STRING" },
+                        missingPoints: { type: "ARRAY", items: { type: "STRING" } }
+                    },
+                    required: ["assessment", "suggestedMark", "feedback"]
+                },
                 temperature: 0.3,
-                maxOutputTokens: 600
-            }
+                // Gemini 2.5 spends part of this budget on internal "thinking"
+                // before any output is emitted, so 600 was getting truncated.
+                // 2048 is comfortable for the structured response we need.
+                maxOutputTokens: 2048
+            },
+            // Disable Gemini-2.5 internal thinking so the entire token budget
+            // goes to the structured answer. Older models ignore this field.
+            thinkingConfig: { thinkingBudget: 0 }
         };
         const res = await fetch(`${ENDPOINT(model)}?key=${encodeURIComponent(apiKey)}`, {
             method: "POST",
@@ -153,36 +172,69 @@
         });
         if (!res.ok) {
             const text = await res.text().catch(() => "");
-            // 404 → the cached model has gone away. Wipe the cache and try once more.
+            // 404 → cached model has gone away. Wipe the cache and try once more.
             if (res.status === 404 && cachedModel) {
                 cachedModel = null;
                 return markAnswer(opts);
             }
+            // Some models reject `thinkingConfig` with 400 INVALID_ARGUMENT —
+            // retry once without it.
+            if (res.status === 400 && /thinkingConfig|thinkingBudget/i.test(text)) {
+                delete body.thinkingConfig;
+                const res2 = await fetch(`${ENDPOINT(model)}?key=${encodeURIComponent(apiKey)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                if (!res2.ok) {
+                    const t2 = await res2.text().catch(() => "");
+                    throw new Error(`Gemini ${res2.status} (model ${model}): ${t2.slice(0, 200) || res2.statusText}`);
+                }
+                const data2 = await res2.json();
+                return extractAndParse(data2, marks);
+            }
             throw new Error(`Gemini ${res.status} (model ${model}): ${text.slice(0, 200) || res.statusText}`);
         }
         const data = await res.json();
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        return parseMarkingResponse(raw, opts.marks || 4);
+        return extractAndParse(data, marks);
     }
 
-    function parseMarkingResponse(raw, marks) {
-        let payload = null;
-        try { payload = JSON.parse(raw); }
-        catch (_) {
-            const stripped = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-            try { payload = JSON.parse(stripped); }
-            catch (_) {
-                const m = raw.match(/\{[\s\S]*\}/);
-                if (m) { try { payload = JSON.parse(m[0]); } catch (_) {} }
-            }
-        }
+    function extractAndParse(data, marks) {
+        // Pick out every text part and concatenate (some models split across parts)
+        const parts = data?.candidates?.[0]?.content?.parts || [];
+        const raw = parts.map(p => p.text || "").join("");
+        const finishReason = data?.candidates?.[0]?.finishReason || "";
+        return parseMarkingResponse(raw, marks, finishReason);
+    }
+
+    function parseMarkingResponse(raw, marks, finishReason) {
         const out = {
-            assessment: "partial",
-            suggestedMark: 0,
+            assessment: null,        // filled below
+            suggestedMark: null,
             feedback: "",
             missingPoints: [],
-            raw
+            raw,
+            truncated: finishReason === "MAX_TOKENS"
         };
+
+        // Pass 1 — strict JSON
+        let payload = tryParseJson(raw);
+        // Pass 2 — strip markdown fences
+        if (!payload) {
+            const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+            payload = tryParseJson(stripped);
+        }
+        // Pass 3 — first {...} block (handles wrapping prose)
+        if (!payload) {
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (m) payload = tryParseJson(m[0]);
+        }
+        // Pass 4 — partial-JSON repair: append closing braces/quote/etc to a
+        // truncated object until it parses (or we give up).
+        if (!payload) {
+            payload = tryRepairTruncated(raw);
+        }
+
         if (payload && typeof payload === "object") {
             if (payload.assessment) out.assessment = String(payload.assessment).toLowerCase();
             if (typeof payload.suggestedMark === "number") {
@@ -192,15 +244,68 @@
             if (Array.isArray(payload.missingPoints)) {
                 out.missingPoints = payload.missingPoints.map(String).slice(0, 6);
             }
-        } else {
-            out.feedback = raw.slice(0, 600);
         }
+
+        // Fallback regex extraction — if the JSON is so broken the repair
+        // failed, scrape individual fields from the raw text. Better than
+        // showing the user a default 0/X with garbled JSON in the feedback.
+        if (out.assessment == null) {
+            const m = raw.match(/"assessment"\s*:\s*"([^"]+)"/);
+            if (m) out.assessment = m[1].toLowerCase();
+        }
+        if (out.suggestedMark == null) {
+            const m = raw.match(/"suggestedMark"\s*:\s*(-?\d+(?:\.\d+)?)/);
+            if (m) out.suggestedMark = Math.max(0, Math.min(marks, Math.round(parseFloat(m[1]))));
+        }
+        if (!out.feedback) {
+            // Capture the feedback string even if its closing quote is missing.
+            const m = raw.match(/"feedback"\s*:\s*"((?:[^"\\]|\\.)*)/);
+            if (m) {
+                try { out.feedback = JSON.parse('"' + m[1].replace(/"$/, "") + '"'); }
+                catch (_) { out.feedback = m[1]; }
+            }
+        }
+
+        // Final defaults
+        if (out.suggestedMark == null) out.suggestedMark = 0;
         if (!["correct", "partial", "incorrect"].includes(out.assessment)) {
             out.assessment = out.suggestedMark >= marks * 0.85 ? "correct"
                 : out.suggestedMark >= marks * 0.4 ? "partial"
                 : "incorrect";
         }
+        // If we *still* don't have any feedback, surface a polite note rather
+        // than the raw JSON soup.
+        if (!out.feedback) {
+            out.feedback = out.truncated
+                ? "AI response was cut off before feedback was written. Try asking for AI feedback again."
+                : "AI didn't return readable feedback. Try the Re-mark button.";
+        }
         return out;
+    }
+
+    function tryParseJson(s) {
+        if (!s) return null;
+        try { return JSON.parse(s); } catch (_) { return null; }
+    }
+
+    // Best-effort repair of a JSON object that got truncated mid-stream.
+    function tryRepairTruncated(raw) {
+        const start = raw.indexOf("{");
+        if (start === -1) return null;
+        let s = raw.slice(start);
+        // If we end inside an open string, close it.
+        const dq = (s.match(/"/g) || []).length;
+        if (dq % 2 === 1) s += '"';
+        // Trim a trailing colon, comma or open bracket that would invalidate.
+        s = s.replace(/[,:\[]\s*$/, "");
+        // Balance braces / brackets by appending what's missing.
+        const opens = (s.match(/\{/g) || []).length;
+        const closes = (s.match(/\}/g) || []).length;
+        for (let i = 0; i < opens - closes; i++) s += "}";
+        const obrk = (s.match(/\[/g) || []).length;
+        const cbrk = (s.match(/\]/g) || []).length;
+        for (let i = 0; i < obrk - cbrk; i++) s += "]";
+        return tryParseJson(s);
     }
 
     function isAvailable(apiKey) { return !!apiKey; }

@@ -134,7 +134,7 @@
             alienBullets: [],
             aliens: spawnAliens(0),
             alienDir: 1,
-            alienSpeed: 0.6,
+            alienSpeed: waveSpeed(1),
             descendStep: 14,
             score: 0,
             lives: 3,
@@ -143,7 +143,10 @@
             paused: false,
             fireCooldown: 0,
             fireRequest: false,
-            lastShotAt: 0
+            lastShotAt: 0,
+            // Mother ship — random sweeps across the top of the screen for big bonus points
+            motherShip: null,
+            nextMotherShipAt: performance.now() + randMs(15000, 25000)
         });
         // Re-bind handlers in case beginGame is called without bindInput
         if (!state.keyHandler) bindInput();
@@ -151,6 +154,12 @@
         renderTimer();
         updateHud();
     }
+
+    function waveSpeed(wave) {
+        // Wave 1 starts at 0.7, wave 2 at ~1.05, etc. Capped at 4 (max).
+        return Math.min(0.7 + (wave - 1) * 0.55, 4);
+    }
+    function randMs(lo, hi) { return lo + Math.random() * (hi - lo); }
 
     function spawnAliens(waveIndex) {
         const aliens = [];
@@ -213,7 +222,33 @@
         if (edge) {
             state.alienDir *= -1;
             for (const a of state.aliens) if (a.alive) a.y += state.descendStep;
-            state.alienSpeed = Math.min(state.alienSpeed + 0.06, 4);
+            // Each edge bump bumps alien speed by ~12% — accelerates quickly
+            // when only a few aliens remain (classic Space Invaders panic).
+            state.alienSpeed = Math.min(state.alienSpeed * 1.12, 4.5);
+        }
+
+        // Mother ship — random sweeps across the top for bonus points
+        const now = performance.now();
+        if (!state.motherShip && now >= state.nextMotherShipAt) {
+            const fromLeft = Math.random() > 0.5;
+            state.motherShip = {
+                x: fromLeft ? -50 : W + 50,
+                y: 28,
+                dir: fromLeft ? 1 : -1,
+                speed: 2 + Math.random() * 1.5,
+                points: 100 + Math.floor(Math.random() * 5) * 50,  // 100/150/200/250/300
+                alive: true
+            };
+            // Brief intro flash
+            state.motherShipAppearedAt = now;
+        }
+        if (state.motherShip) {
+            state.motherShip.x += state.motherShip.dir * state.motherShip.speed;
+            // Off-screen → despawn, schedule next
+            if (state.motherShip.x < -80 || state.motherShip.x > W + 80) {
+                state.motherShip = null;
+                state.nextMotherShipAt = now + randMs(15000, 25000);
+            }
         }
 
         // Alien shoot (random)
@@ -237,6 +272,28 @@
                     break;
                 }
             }
+        }
+        // Bullet vs mother ship
+        if (state.motherShip) {
+            const ms = state.motherShip;
+            const msW = 70, msH = 28;
+            for (const b of state.bullets) {
+                if (b.dead) continue;
+                if (b.x + BULLET_W > ms.x - msW / 2 && b.x < ms.x + msW / 2 &&
+                    b.y < ms.y + msH / 2 && b.y + BULLET_H > ms.y - msH / 2) {
+                    b.dead = true;
+                    state.score += ms.points;
+                    state.motherShipBonus = { points: ms.points, x: ms.x, y: ms.y, t: 0 };
+                    state.motherShip = null;
+                    state.nextMotherShipAt = performance.now() + randMs(15000, 25000);
+                    break;
+                }
+            }
+        }
+        // Floating mother-ship bonus text fades over ~1s
+        if (state.motherShipBonus) {
+            state.motherShipBonus.t += 16;
+            if (state.motherShipBonus.t > 900) state.motherShipBonus = null;
         }
         state.bullets = state.bullets.filter(b => !b.dead);
 
@@ -262,8 +319,11 @@
             state.wave++;
             state.aliens = spawnAliens(state.wave - 1);
             state.alienDir = 1;
-            state.alienSpeed = Math.min(0.6 + state.wave * 0.4, 4);
+            state.alienSpeed = waveSpeed(state.wave);
             state.score += 100;
+            // Reset mother ship cycle for the new wave
+            state.motherShip = null;
+            state.nextMotherShipAt = performance.now() + randMs(8000, 18000);
         }
 
         updateHud();
@@ -371,6 +431,69 @@
                 primary: breed.primary, accent: breed.accent, eyeColor: breed.eyeColor,
                 ears: breed.ears
             });
+        }
+
+        // Mother ship (UFO with a passenger cat)
+        if (state.motherShip) {
+            const ms = state.motherShip;
+            ctx.save();
+            ctx.translate(ms.x, ms.y);
+            // Glow halo
+            const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 70);
+            glow.addColorStop(0, "rgba(255, 215, 102, 0.55)");
+            glow.addColorStop(1, "rgba(255, 215, 102, 0)");
+            ctx.fillStyle = glow;
+            ctx.fillRect(-70, -45, 140, 90);
+            // Saucer body
+            ctx.fillStyle = "#c8c8d4";
+            ctx.beginPath();
+            ctx.ellipse(0, 6, 36, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Saucer shine
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.beginPath();
+            ctx.ellipse(-8, 4, 14, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Glass dome
+            ctx.fillStyle = "rgba(120, 200, 255, 0.55)";
+            ctx.beginPath();
+            ctx.arc(0, -2, 16, Math.PI, 0);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.6)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(0, -2, 16, Math.PI, 0);
+            ctx.stroke();
+            // Tiny saucer lights underneath
+            for (let i = -2; i <= 2; i++) {
+                ctx.fillStyle = (Math.floor(performance.now() / 150) + i) % 2 ? "#ffd166" : "#ff7f51";
+                ctx.beginPath();
+                ctx.arc(i * 12, 12, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+            // Pilot cat in the dome (different colour to stand out)
+            window.drawCanvasCat(ctx, ms.x, ms.y - 4, 22, {
+                primary: "#9b5de5", accent: "#5a189a", eyeColor: "#ffd166", ears: "big"
+            });
+            // BONUS label drifting alongside
+            ctx.fillStyle = "#ffd166";
+            ctx.font = "bold 11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("✨ BONUS", ms.x, ms.y + 28);
+        }
+
+        // Mother-ship bonus floating text
+        if (state.motherShipBonus) {
+            const b = state.motherShipBonus;
+            const a = 1 - b.t / 900;
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.fillStyle = "#ffd166";
+            ctx.font = "bold 22px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(`+${b.points}!`, b.x, b.y - b.t * 0.04);
+            ctx.restore();
         }
 
         // Bullets (player)

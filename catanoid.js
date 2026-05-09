@@ -84,7 +84,7 @@
             <header class="break-game-header">
                 <div>
                     <h1>🧱 Catanoid</h1>
-                    <p class="break-game-blurb">Smash the brick-cats. Move the paddle with mouse or ←/→. Space to launch.</p>
+                    <p class="break-game-blurb">Smash the brick-cats. Move with mouse OR ←/→. Space to launch. Ball gets faster every paddle bounce!</p>
                 </div>
                 <div class="tetris-timer-wrap">
                     <div class="tetris-timer-label" id="catanoid-timer-label">Time left</div>
@@ -236,14 +236,16 @@
         }
 
         // ---- Paddle movement ----
+        // Both mouse aim AND arrow keys work; whichever was used most recently wins.
         const padW = paddleWidth();
-        if (mouseX != null) {
-            state.paddle.x = Math.max(FIELD_PADX, Math.min(W - padW - FIELD_PADX, mouseX - padW / 2));
-        } else {
+        const usingKeys = keys.left || keys.right;
+        if (usingKeys) {
             if (keys.left) state.paddle.x -= 7;
             if (keys.right) state.paddle.x += 7;
-            state.paddle.x = Math.max(FIELD_PADX, Math.min(W - padW - FIELD_PADX, state.paddle.x));
+        } else if (mouseX != null) {
+            state.paddle.x = mouseX - padW / 2;
         }
+        state.paddle.x = Math.max(FIELD_PADX, Math.min(W - padW - FIELD_PADX, state.paddle.x));
 
         // ---- Balls ----
         const r = ballRadius();

@@ -2490,10 +2490,13 @@
         });
         $("#settings-test-key").addEventListener("click", async () => {
             const status = $("#settings-key-status");
-            status.textContent = "Testing connection…";
+            status.textContent = "Testing connection… (discovering supported model)";
             try {
                 const ok = await window.AI.testKey(state.settings.geminiApiKey);
-                status.textContent = ok ? "✅ Key works!" : "❌ Key did not work — double-check it.";
+                const model = window.AI.getDiscoveredModel();
+                status.textContent = ok
+                    ? `✅ Key works! Using model: ${model || "(unknown)"}`
+                    : "❌ Key did not work — double-check it.";
             } catch (e) {
                 status.textContent = "❌ " + (e.message || "Network error");
             }

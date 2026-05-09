@@ -96,7 +96,7 @@
             const raw = localStorage.getItem(STORAGE_KEY);
             if (!raw) return defaultState();
             const parsed = JSON.parse(raw);
-            return Object.assign(defaultState(), parsed);
+            return migrateState(Object.assign(defaultState(), parsed));
         } catch (_) {
             return defaultState();
         }
@@ -108,25 +108,55 @@
             subjects[s] = {
                 attempts: {},        // questionId -> { answer, correct, attempts }
                 quizSessions: [],    // [{ mode, score, total, date, topicId }]
-                bestScores: {}       // mode key -> best ratio
+                bestScores: {},      // mode key -> best ratio
+                // Per-exam saved attempt: full answer state (so re-launch can preload).
+                // examProgress[examId] = { answers, currentIndex, finished, completedAt, timer? }
+                examProgress: {}
             };
         });
         return {
             subjects,
-            settings: { reducedMotion: false },
+            settings: {
+                reducedMotion: false,
+                customName: "Harper",     // shown in greetings/headers
+                geminiApiKey: ""          // empty = AI features disabled
+            },
             stats: { totalAnswered: 0, totalCorrect: 0, currentStreak: 0, bestStreak: 0 },
             clan: {
-                cats: [],            // [{ breedId, name, dateISO, lastInteractedISO, happiness }]
-                claimTickets: 0,     // tokens to spend on a new cat
-                perfectExams: {}     // mode -> true once a 100% has been scored (one ticket per exam)
+                cats: [],
+                claimTickets: 0,
+                perfectExams: {}
             },
             breaks: {
-                lastBreakStartISO: null,  // when the most recent break STARTED
-                catrisHighScore: 0,       // best Catris score
-                invadersHighScore: 0,     // best Cat Invaders score
-                catanoidHighScore: 0      // best Catanoid score
+                lastBreakStartISO: null,
+                catrisHighScore: 0,
+                invadersHighScore: 0,
+                catanoidHighScore: 0
             }
         };
+    }
+
+    // Shallow-merge any missing keys from defaults into loaded state so older
+    // saved JSON gets the new fields without erasing existing data.
+    function migrateState(s) {
+        const def = defaultState();
+        if (!s.settings) s.settings = {};
+        for (const k of Object.keys(def.settings)) {
+            if (s.settings[k] === undefined) s.settings[k] = def.settings[k];
+        }
+        if (!s.subjects) s.subjects = def.subjects;
+        for (const subjId of SUBJECTS) {
+            if (!s.subjects[subjId]) s.subjects[subjId] = def.subjects[subjId];
+            const sub = s.subjects[subjId];
+            if (!sub.examProgress) sub.examProgress = {};
+            if (!sub.attempts) sub.attempts = {};
+            if (!sub.quizSessions) sub.quizSessions = [];
+            if (!sub.bestScores) sub.bestScores = {};
+        }
+        if (!s.clan) s.clan = def.clan;
+        if (!s.breaks) s.breaks = def.breaks;
+        if (!s.stats) s.stats = def.stats;
+        return s;
     }
 
     const BREAK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between breaks
@@ -200,6 +230,13 @@
         // Stop any park timers if we're leaving the park-play view
         const goingToParkPlay = route[0] === "clan" && route[1] === "park" && route[2] === "play";
         if (!goingToParkPlay && window.Park && window.Park.stop) window.Park.stop();
+        // If we were in a mock quiz and we're navigating away, pause its timer.
+        const goingToQuiz = route[0] === "subject" && route[2] === "quiz" && route[3];
+        const sameQuiz = goingToQuiz && session && session.subjectId === route[1] && session.mode === route[3];
+        if (session && session.isMock && !sameQuiz) {
+            pauseMockTimer();
+        }
+
         // Going into the break section?
         const goingToBreak = route[0] === "break";
         const goingToBreakGame = goingToBreak && route[1];
@@ -225,6 +262,7 @@
         updateClanBadge();
         if (route.length === 0) return renderHome(root);
         if (route[0] === "progress") return renderProgress(root);
+        if (route[0] === "settings") return renderSettings(root);
         if (route[0] === "break") {
             if (route[1] === "catris") return renderBreakGame(root, "catris");
             if (route[1] === "invaders") return renderBreakGame(root, "invaders");
@@ -263,11 +301,12 @@
     /* ---------- Home view ---------- */
 
     function renderHome(root) {
+        const name = customName();
         const greetings = [
-            "Hi Harper! What shall we study?",
-            "Hi Harper! Pick a subject — your study cats are ready 🐱",
-            "Welcome back, Harper. One question at a time.",
-            "Hi Harper! You've got this."
+            `Hi ${name}! What shall we study?`,
+            `Hi ${name}! Pick a subject — your study cats are ready 🐱`,
+            `Welcome back, ${name}. One question at a time.`,
+            `Hi ${name}! You've got this.`
         ];
         const greeting = greetings[Math.floor(Math.random() * greetings.length)];
 
@@ -342,9 +381,14 @@
             ${isMaths ? `
             <aside class="maths-tip">
                 <strong>💡 Need a hand?</strong>
-                Every Maths Practice question has a <em>Help</em> button — tap it for step-by-step working. (Help is hidden during Mock Exams to mirror real exam conditions.)
+                Every Maths Practice question has a <em>Hint</em> and <em>Help</em> button. Use the 🧮 calculator any time during practice. (Both are hidden during Mock Exams to mirror real exam conditions.)
+                <button type="button" class="primary-btn calc-launch" id="calc-launch-subject">🧮 Open calculator</button>
             </aside>` : ""}
         `;
+        if (isMaths) {
+            const calcBtn = document.getElementById("calc-launch-subject");
+            if (calcBtn) calcBtn.addEventListener("click", () => window.Calc && window.Calc.open());
+        }
     }
 
     function renderMockExamsSection(subjectId, subj) {
@@ -526,6 +570,33 @@
         // Tag each position with a unique key so duplicate question IDs in an
         // exam (allowed when pools are small) get independent session state.
         const tagged = ordered.map((q, i) => Object.assign({}, q, { _sessionKey: `${i}-${q.id}` }));
+
+        // Load previously-saved answers for this exam (per-exam persistence).
+        // Practice exams: ALWAYS preload (unlocked), so Harper can see her last attempt.
+        // Mocks: preload only if the previous attempt was unfinished (resume).
+        const saved = exam ? getExamProgress(subjectId, mode) : null;
+        const preloadedAnswers = {};
+        if (saved && saved.answers) {
+            for (const k of Object.keys(saved.answers)) {
+                const src = saved.answers[k];
+                // For practice re-attempts, copy answer text/option but unlock and clear
+                // any "locked / correct" stale state so Harper can change her answer.
+                if (!isMock) {
+                    preloadedAnswers[k] = {
+                        user: src.user,
+                        userText: src.userText,
+                        revealed: false,
+                        locked: false,
+                        correct: false,
+                        aiFeedback: src.aiFeedback   // keep AI feedback so it carries across
+                    };
+                } else if (saved.finished === false) {
+                    // Resuming an in-progress mock — keep locks intact.
+                    preloadedAnswers[k] = Object.assign({}, src);
+                }
+            }
+        }
+
         session = {
             subjectId, mode, exam,
             isMock,
@@ -534,10 +605,183 @@
             index: 0,
             correct: 0,
             attempted: 0,
-            answers: {}, // sessionKey -> { user, userText, correct, locked, revealed }
+            answers: preloadedAnswers,
+            helpStates: {},
             sessionStreak: 0
         };
+        if (isMock) startMockTimer();
         renderCurrentQuestion(root);
+    }
+
+    /* ---------- AI marking helpers ---------- */
+
+    function renderAIFeedback(ai, marks) {
+        const cls = ai.assessment === "correct" ? "ai-good" :
+                    ai.assessment === "incorrect" ? "ai-bad" : "ai-partial";
+        const bullets = (ai.missingPoints || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
+        return `
+            <div class="ai-feedback-card ${cls}">
+                <div class="ai-feedback-head">
+                    <strong>🤖 AI assessment: ${escapeHtml(ai.assessment || "—")}</strong>
+                    <span class="ai-feedback-mark">Suggested mark: ${ai.suggestedMark}/${marks || "?"}</span>
+                </div>
+                <p class="ai-feedback-text">${escapeHtml(ai.feedback || "")}</p>
+                ${bullets ? `<ul class="ai-feedback-points">${bullets}</ul>` : ""}
+                <p class="ai-disclaimer">AI marking can be wrong — check against the sample answer and use the "I got this right" toggle if you disagree.</p>
+            </div>
+        `;
+    }
+
+    async function requestAIFeedback(q, isLocked) {
+        const k = keyOf(q);
+        const apiKey = (state.settings && state.settings.geminiApiKey) || "";
+        if (!apiKey) {
+            alert("Add a Gemini API key in Settings to enable AI marking.");
+            return;
+        }
+        const userText = (session.answers[k] && session.answers[k].userText) || "";
+        if (!userText.trim()) {
+            alert("Type a response first, then ask for AI feedback.");
+            return;
+        }
+        const aiBtn = $("#ai-mark-btn");
+        if (aiBtn) {
+            aiBtn.disabled = true;
+            aiBtn.textContent = "🤖 Marking…";
+        }
+        const subj = window.SUBJECT_DATA[session.subjectId];
+        try {
+            const result = await window.AI.markAnswer({
+                apiKey,
+                question: q.q,
+                sample: q.sample || "",
+                response: userText,
+                marks: q.marks || 4,
+                subjectName: subj.name
+            });
+            if (!session.answers[k]) session.answers[k] = { userText, correct: false };
+            session.answers[k].aiFeedback = Object.assign({}, result, { markedAt: new Date().toISOString() });
+            persistAnswerForExam(q, session.answers[k]);
+            // Re-render answer area with the new feedback
+            renderAnswerArea(q, session.answers[k], isLocked);
+        } catch (e) {
+            if (aiBtn) {
+                aiBtn.disabled = false;
+                aiBtn.textContent = "🤖 Try again";
+            }
+            alert("AI marking failed: " + (e.message || "unknown error"));
+        }
+    }
+
+    /* ---------- examProgress helpers ---------- */
+
+    function getExamProgress(subjectId, examId) {
+        const sub = state.subjects[subjectId];
+        if (!sub.examProgress) sub.examProgress = {};
+        return sub.examProgress[examId] || null;
+    }
+
+    function ensureExamProgress(subjectId, examId) {
+        const sub = state.subjects[subjectId];
+        if (!sub.examProgress) sub.examProgress = {};
+        if (!sub.examProgress[examId]) {
+            sub.examProgress[examId] = { answers: {}, finished: false };
+        }
+        return sub.examProgress[examId];
+    }
+
+    function persistAnswerForExam(q, ansSnapshot) {
+        if (!session || !session.exam) return;
+        const ep = ensureExamProgress(session.subjectId, session.mode);
+        ep.answers[keyOf(q)] = Object.assign({}, ansSnapshot);
+        saveState();
+    }
+
+    /* ---------- Mock exam timer ---------- */
+
+    let mockTimerInterval = null;
+
+    function ensureMockTimer(ep, mock) {
+        if (!ep.timer) {
+            const minutes = (mock && mock.duration) || 60;
+            ep.timer = {
+                durationMs: minutes * 60 * 1000,
+                elapsedMs: 0,
+                lastResumeAt: null,
+                autoSubmitted: false
+            };
+        }
+        return ep.timer;
+    }
+
+    function startMockTimer() {
+        if (!session || !session.isMock) return;
+        const ep = ensureExamProgress(session.subjectId, session.mode);
+        const t = ensureMockTimer(ep, session.exam);
+        // Resume from saved elapsed
+        t.lastResumeAt = new Date().toISOString();
+        ep.finished = false;
+        saveState();
+        if (mockTimerInterval) clearInterval(mockTimerInterval);
+        mockTimerInterval = setInterval(tickMockTimer, 1000);
+        renderMockTimerChip();
+    }
+
+    function pauseMockTimer() {
+        if (!session || !session.isMock) return;
+        const ep = state.subjects[session.subjectId].examProgress[session.mode];
+        if (!ep || !ep.timer) return;
+        if (ep.timer.lastResumeAt) {
+            const elapsed = Date.now() - new Date(ep.timer.lastResumeAt).getTime();
+            ep.timer.elapsedMs += Math.max(0, elapsed);
+            ep.timer.lastResumeAt = null;
+            saveState();
+        }
+        if (mockTimerInterval) {
+            clearInterval(mockTimerInterval);
+            mockTimerInterval = null;
+        }
+    }
+
+    function tickMockTimer() {
+        if (!session || !session.isMock) { stopMockTimerInterval(); return; }
+        const ep = state.subjects[session.subjectId].examProgress[session.mode];
+        if (!ep || !ep.timer || !ep.timer.lastResumeAt) return;
+        const total = mockTotalElapsed(ep.timer);
+        if (total >= ep.timer.durationMs) {
+            ep.timer.autoSubmitted = true;
+            saveState();
+            stopMockTimerInterval();
+            // Trigger automatic submit
+            const root = $("#app");
+            finishQuiz(root);
+            return;
+        }
+        renderMockTimerChip();
+    }
+
+    function stopMockTimerInterval() {
+        if (mockTimerInterval) { clearInterval(mockTimerInterval); mockTimerInterval = null; }
+    }
+
+    function mockTotalElapsed(timer) {
+        if (!timer) return 0;
+        const base = timer.elapsedMs || 0;
+        if (!timer.lastResumeAt) return base;
+        return base + (Date.now() - new Date(timer.lastResumeAt).getTime());
+    }
+
+    function renderMockTimerChip() {
+        const chip = document.getElementById("mock-timer-chip");
+        if (!chip || !session || !session.isMock) return;
+        const ep = state.subjects[session.subjectId].examProgress[session.mode];
+        if (!ep || !ep.timer) return;
+        const remaining = Math.max(0, ep.timer.durationMs - mockTotalElapsed(ep.timer));
+        const m = Math.floor(remaining / 60000);
+        const s = Math.floor((remaining % 60000) / 1000);
+        chip.textContent = `⏱ ${m}:${String(s).padStart(2, "0")}`;
+        chip.classList.toggle("warning", remaining < 5 * 60 * 1000);
+        chip.classList.toggle("critical", remaining < 60 * 1000);
     }
 
     // Per-position key used for session.answers (so duplicate q.id's stay separate)
@@ -570,6 +814,7 @@
                     <div class="quiz-meta">
                         <span class="quiz-subject">${subj.icon} ${escapeHtml(subj.name)}</span>
                         ${session.exam ? `<span class="${session.isMock ? 'mock-pill' : 'exam-pill'}">${session.isMock ? '📝 Mock' : '🎯 Practice'} · ${escapeHtml(session.exam.name)}</span>` : ""}
+                        ${session.isMock ? `<span class="mock-timer-chip" id="mock-timer-chip">⏱ —:—</span>` : ""}
                         <span class="quiz-topic">${topic ? escapeHtml(topic.name) : ""}</span>
                     </div>
                     <div class="quiz-counter">Question ${num} / ${total}</div>
@@ -578,11 +823,10 @@
                 <article class="question-card ${isLocked ? "is-locked" : ""}">
                     <div class="qtype-badge">${type === "mcq" ? "Multiple choice" : type === "long" ? "Extended response" : "Short answer"}</div>
                     <div class="question-prompt">${renderText(q.q)}</div>
-                    ${q.marks ? `<div class="marks">[${q.marks} mark${q.marks === 1 ? "" : "s"}]</div>` : ""}
+                    ${q.marks && !session.isMock ? `<div class="marks">[${q.marks} mark${q.marks === 1 ? "" : "s"}]</div>` : ""}
                     ${isLocked ? `<div class="locked-indicator">🔒 Answer locked — review only</div>` : ""}
                     <div class="answer-area" id="answer-area"></div>
-                    ${q.help && !session.isMock ? `<button type="button" class="help-btn" id="help-btn">💡 Need help?</button>
-                        <div class="help-panel" id="help-panel" hidden></div>` : ""}
+                    ${q.help && !session.isMock ? renderHintHelpBlock(q) : ""}
                     <div class="feedback" id="feedback" aria-live="polite"></div>
                     <div class="quiz-controls">
                         <button type="button" class="ghost-btn" id="prev-btn" ${session.index === 0 ? "disabled" : ""}>← Prev</button>
@@ -590,13 +834,23 @@
                     </div>
                 </article>
             </div>
+            ${session.subjectId === "maths" && !session.isMock ? `<button type="button" id="calc-fab" class="calc-fab" title="Open calculator (C)">🧮</button>` : ""}
         `;
 
         renderAnswerArea(q, previous, isLocked);
 
+        if (session.isMock) renderMockTimerChip();
+
         if (q.help && !session.isMock) {
-            $("#help-btn").addEventListener("click", () => toggleHelp(q));
+            wireHintHelp(q);
+            // If this question already has a session-stored reveal, show it
+            const helpState = (session.helpStates && session.helpStates[keyOf(q)]) || {};
+            if (helpState.hintRevealed) revealHint(q, true);
+            if (helpState.helpRevealed) revealHelp(q, true);
+            if (helpState.fullRevealed) revealFull(q, true);
         }
+        const calcFab = document.getElementById("calc-fab");
+        if (calcFab) calcFab.addEventListener("click", () => window.Calc && window.Calc.open());
         $("#prev-btn").addEventListener("click", () => {
             if (session.index > 0) {
                 session.index--;
@@ -643,13 +897,17 @@
             const value = previous && previous.userText ? previous.userText : "";
             const showSample = previous && previous.revealed;
             const ro = isLocked ? "readonly" : "";
+            const aiKey = (state.settings && state.settings.geminiApiKey) || "";
+            const ai = previous && previous.aiFeedback;
             area.innerHTML = `
                 <textarea id="written-answer" rows="${type === "long" ? 12 : 6}" ${ro} placeholder="${session.isMock ? "Type your response. Once you press Next it will be locked." : "Plan and write your response here. (Saved automatically.)"}">${escapeHtml(value)}</textarea>
                 ${session.isMock ? `` : `
                     <div class="written-actions">
                         <button type="button" class="ghost-btn" id="reveal-sample">${showSample ? "Hide" : "Show"} sample answer</button>
                         <button type="button" class="ghost-btn" id="self-correct">${previous && previous.correct ? "Marked correct ✓" : "I got this right"}</button>
+                        ${aiKey ? `<button type="button" class="ai-btn" id="ai-mark-btn">🤖 ${ai ? "Re-mark" : "Get AI feedback"}</button>` : ""}
                     </div>
+                    ${ai ? renderAIFeedback(ai, q.marks) : ""}
                     <div class="sample" id="sample-block" ${showSample ? "" : "hidden"}>
                         <h4>Sample / marker's notes</h4>
                         <p>${renderText(q.sample)}</p>
@@ -668,9 +926,16 @@
             `;
             const ta = $("#written-answer");
             if (ta && !isLocked) {
+                let saveTimer = null;
                 ta.addEventListener("input", e => {
                     if (!session.answers[k]) session.answers[k] = { userText: "", correct: false };
                     session.answers[k].userText = e.target.value;
+                    // Debounce persistence so we don't write to localStorage on every keystroke.
+                    if (saveTimer) clearTimeout(saveTimer);
+                    saveTimer = setTimeout(() => persistAnswerForExam(q, session.answers[k]), 700);
+                });
+                ta.addEventListener("blur", () => {
+                    if (session.answers[k]) persistAnswerForExam(q, session.answers[k]);
                 });
             }
             const revealBtn = $("#reveal-sample");
@@ -678,6 +943,7 @@
                 revealBtn.addEventListener("click", () => {
                     if (!session.answers[k]) session.answers[k] = { userText: "", correct: false };
                     session.answers[k].revealed = !session.answers[k].revealed;
+                    persistAnswerForExam(q, session.answers[k]);
                     renderAnswerArea(q, session.answers[k], isLocked);
                 });
             }
@@ -689,8 +955,14 @@
                     if (session.answers[k].correct) {
                         window.Cats.popIn({ expression: "cheering", message: pickPhrase("correct") });
                     }
+                    persistAnswerForExam(q, session.answers[k]);
                     renderAnswerArea(q, session.answers[k], isLocked);
                 });
+            }
+            // 🤖 AI feedback button (practice exams only, when API key set)
+            const aiBtn = $("#ai-mark-btn");
+            if (aiBtn && !session.isMock) {
+                aiBtn.addEventListener("click", () => requestAIFeedback(q, isLocked));
             }
         }
     }
@@ -747,6 +1019,12 @@
 
         session.answers[k] = { user: idx, correct, locked: nowLocked };
 
+        // Wrong-answer reveal: if the player just locked in a wrong answer on a
+        // Maths-style question with help data, show the full solution panel.
+        if (willLock && !correct && !session.isMock && q.help) {
+            revealFull(q, true);
+        }
+
         // Show the locked indicator dynamically if it wasn't there before.
         if (willLock) {
             const card = document.querySelector(".question-card");
@@ -779,17 +1057,94 @@
         }
     }
 
-    function toggleHelp(q) {
-        const panel = $("#help-panel");
-        if (!panel) return;
-        if (!panel.hidden) { panel.hidden = true; return; }
-        const help = q.help || {};
-        const stepsHtml = (help.steps || []).map(s => `<li>${renderText(s)}</li>`).join("");
-        panel.innerHTML = `
-            ${help.rule ? `<p class="help-rule"><strong>Rule:</strong> ${renderText(help.rule)}</p>` : ""}
-            ${stepsHtml ? `<ol class="help-steps">${stepsHtml}</ol>` : ""}
+    /* ---------- Hint / Help / Full reveal (Maths) ---------- */
+
+    function renderHintHelpBlock(q) {
+        return `
+            <div class="hint-help">
+                <button type="button" class="help-btn hint-btn" id="hint-btn">💡 Hint</button>
+                <button type="button" class="help-btn help-btn-explain" id="help-btn" disabled>🔍 Help <small>(after Hint)</small></button>
+                <div class="hint-panel" id="hint-panel" hidden></div>
+                <div class="help-panel help-panel-working" id="help-panel" hidden></div>
+                <div class="help-panel reveal-panel" id="reveal-panel" hidden></div>
+            </div>
         `;
-        panel.hidden = false;
+    }
+
+    function wireHintHelp(q) {
+        const k = keyOf(q);
+        if (!session.helpStates) session.helpStates = {};
+        if (!session.helpStates[k]) session.helpStates[k] = { hintRevealed: false, helpRevealed: false, fullRevealed: false };
+        const hintBtn = $("#hint-btn");
+        const helpBtn = $("#help-btn");
+        if (hintBtn) hintBtn.addEventListener("click", () => revealHint(q, false));
+        if (helpBtn) helpBtn.addEventListener("click", () => revealHelp(q, false));
+    }
+
+    function helpStateFor(q) {
+        if (!session.helpStates) session.helpStates = {};
+        const k = keyOf(q);
+        if (!session.helpStates[k]) session.helpStates[k] = { hintRevealed: false, helpRevealed: false, fullRevealed: false };
+        return session.helpStates[k];
+    }
+
+    function revealHint(q, silent) {
+        const help = q.help || {};
+        const panel = $("#hint-panel");
+        if (panel && help.rule) {
+            panel.innerHTML = `<p class="help-rule"><strong>Hint:</strong> ${renderText(help.rule)}</p>`;
+            panel.hidden = false;
+        }
+        const helpBtn = $("#help-btn");
+        if (helpBtn) helpBtn.disabled = false;
+        const hintBtn = $("#hint-btn");
+        if (hintBtn) {
+            hintBtn.disabled = true;
+            hintBtn.textContent = "💡 Hint shown";
+        }
+        const st = helpStateFor(q);
+        st.hintRevealed = true;
+    }
+
+    function revealHelp(q, silent) {
+        const help = q.help || {};
+        const steps = help.steps || [];
+        // Working steps = all but the last (the last typically contains the answer)
+        const working = steps.length > 1 ? steps.slice(0, -1) : steps.slice();
+        const panel = $("#help-panel");
+        if (panel && working.length) {
+            panel.innerHTML = `
+                <p class="help-label"><strong>Working steps:</strong></p>
+                <ol class="help-steps">${working.map(s => `<li>${renderText(s)}</li>`).join("")}</ol>
+                <p class="help-tip">Try the calculation yourself before peeking at the answer.</p>
+            `;
+            panel.hidden = false;
+        }
+        const helpBtn = $("#help-btn");
+        if (helpBtn) {
+            helpBtn.disabled = true;
+            helpBtn.textContent = "🔍 Help shown";
+        }
+        const st = helpStateFor(q);
+        st.helpRevealed = true;
+    }
+
+    function revealFull(q, silent) {
+        const help = q.help || {};
+        const steps = help.steps || [];
+        const lastStep = steps.length ? steps[steps.length - 1] : "";
+        const panel = $("#reveal-panel");
+        if (panel) {
+            panel.innerHTML = `
+                <p class="help-label"><strong>Full solution:</strong></p>
+                ${help.rule ? `<p class="help-rule">${renderText(help.rule)}</p>` : ""}
+                ${steps.length ? `<ol class="help-steps">${steps.map(s => `<li>${renderText(s)}</li>`).join("")}</ol>` : ""}
+                ${q.explain ? `<p class="help-explain">${renderText(q.explain)}</p>` : ""}
+            `;
+            panel.hidden = false;
+        }
+        const st = helpStateFor(q);
+        st.fullRevealed = true;
     }
 
     function commitAnswer(q) {
@@ -800,11 +1155,14 @@
             // In any lock-mode (practice OR mock), an unanswered question gets locked on Next.
             if (session.isLockMode) {
                 session.answers[k] = { locked: true, correct: false };
+                persistAnswerForExam(q, session.answers[k]);
             }
             return;
         }
         // Lock answers in any lock-mode (practice OR mock).
         if (session.isLockMode) ans.locked = true;
+        // Persist to examProgress so re-launch can preload.
+        persistAnswerForExam(q, ans);
 
         const wasCorrect = !!ans.correct;
         // Per-question history (subjState.attempts) is keyed by the canonical q.id
@@ -830,6 +1188,21 @@
     }
 
     function finishQuiz(root) {
+        // Stop the timer first so it can't fire again during marking
+        stopMockTimerInterval();
+        if (session && session.isMock) {
+            // Bake current elapsed into elapsedMs
+            const ep = state.subjects[session.subjectId].examProgress[session.mode];
+            if (ep && ep.timer && ep.timer.lastResumeAt) {
+                ep.timer.elapsedMs += Date.now() - new Date(ep.timer.lastResumeAt).getTime();
+                ep.timer.lastResumeAt = null;
+            }
+        }
+        // For Mock Exams, take the dedicated Exam Report path (with AI marking).
+        if (session && session.isMock) {
+            return renderExamReport(root);
+        }
+
         const total = session.questions.length;
         let correct = 0;
         session.questions.forEach(q => {
@@ -851,6 +1224,23 @@
             date: new Date().toISOString()
         });
         if (isNewBest) subjState.bestScores[session.mode] = ratio;
+
+        // Persist all answers + final state into examProgress so re-launch preloads them.
+        if (session.exam) {
+            const ep = ensureExamProgress(session.subjectId, session.mode);
+            ep.answers = {};
+            for (const q of session.questions) {
+                const a = session.answers[keyOf(q)];
+                if (a) ep.answers[keyOf(q)] = Object.assign({}, a);
+            }
+            ep.finished = true;
+            ep.completedAt = new Date().toISOString();
+            ep.lastScore = ratio;
+            ep.lastCorrect = correct;
+            ep.lastTotal = total;
+            // Clear any timer for mocks (they're not in-progress anymore)
+            if (ep.timer) ep.timer.lastResumeAt = null;
+        }
 
         // 🐾 Cat clan: scoring 100% on an exam grants a claim ticket (one per exam ID).
         const isPerfect = total > 0 && correct === total;
@@ -984,6 +1374,199 @@
                 duration: 3000, side: "left"
             }), 2200);
         }
+    }
+
+    /* ---------- Mock Exam Report ---------- */
+
+    async function renderExamReport(root) {
+        const subj = window.SUBJECT_DATA[session.subjectId];
+        const subjState = state.subjects[session.subjectId];
+        const ep = ensureExamProgress(session.subjectId, session.mode);
+        const apiKey = (state.settings && state.settings.geminiApiKey) || "";
+
+        // Identify written questions (no q.options) and queue AI marking for any
+        // that have a response and don't already have AI feedback cached.
+        const writtenQs = session.questions.filter(q => !q.options);
+        const toMark = apiKey ? writtenQs.filter(q => {
+            const a = session.answers[keyOf(q)] || {};
+            return (a.userText || "").trim().length > 0 && !a.aiFeedback;
+        }) : [];
+
+        // Show interstitial
+        root.innerHTML = `
+            <section class="results-hero is-mock grade-c">
+                <div class="results-cat-wrap">
+                    <div class="results-cat">${window.Cats.svg("thinking", "ginger")}</div>
+                </div>
+                <div class="results-headline">
+                    <div class="mock-stamp">📝 ${escapeHtml(session.exam ? session.exam.name : "Mock Exam")}</div>
+                    <h1 class="ceremony-title">Marking your paper…</h1>
+                    <p class="ceremony-sub" id="exam-marking-progress">${apiKey ? `🤖 AI is reviewing your written answers (0 / ${toMark.length})` : "Compiling your results…"}</p>
+                </div>
+            </section>
+        `;
+
+        // Run AI marking in sequence (concurrency 1 to be polite to free tier).
+        let done = 0;
+        for (const q of toMark) {
+            try {
+                const result = await window.AI.markAnswer({
+                    apiKey,
+                    question: q.q,
+                    sample: q.sample || "",
+                    response: (session.answers[keyOf(q)] || {}).userText || "",
+                    marks: q.marks || 4,
+                    subjectName: subj.name
+                });
+                const a = session.answers[keyOf(q)] || {};
+                a.aiFeedback = Object.assign({}, result, { markedAt: new Date().toISOString() });
+                // The AI's call sets the "correct" flag too — but Harper can override on the report.
+                if (result.assessment === "correct") a.correct = true;
+                session.answers[keyOf(q)] = a;
+                ep.answers[keyOf(q)] = Object.assign({}, a);
+                saveState();
+            } catch (e) {
+                const a = session.answers[keyOf(q)] || {};
+                a.aiFeedback = { assessment: "partial", suggestedMark: 0, feedback: "AI marking failed: " + (e.message || ""), missingPoints: [] };
+                session.answers[keyOf(q)] = a;
+            }
+            done++;
+            const prog = document.getElementById("exam-marking-progress");
+            if (prog) prog.textContent = `🤖 AI is reviewing your written answers (${done} / ${toMark.length})`;
+        }
+
+        // Compute per-section scores
+        const mcqQs = session.questions.filter(q => q.options);
+        const writtenQsAll = session.questions.filter(q => !q.options);
+        const mcqCorrect = mcqQs.reduce((n, q) => n + ((session.answers[keyOf(q)] || {}).correct ? 1 : 0), 0);
+        const mcqMarks = mcqQs.length;
+        let writtenAchieved = 0, writtenMax = 0;
+        for (const q of writtenQsAll) {
+            const a = session.answers[keyOf(q)] || {};
+            const max = q.marks || 4;
+            writtenMax += max;
+            if (a.correct) {
+                writtenAchieved += max;
+            } else if (a.aiFeedback && typeof a.aiFeedback.suggestedMark === "number") {
+                writtenAchieved += Math.max(0, Math.min(max, a.aiFeedback.suggestedMark));
+            }
+        }
+        const totalAchieved = mcqCorrect + writtenAchieved;
+        const totalMarks = mcqMarks + writtenMax;
+        const ratio = totalMarks ? totalAchieved / totalMarks : 0;
+
+        // Persist results
+        const previousBest = subjState.bestScores[session.mode] || 0;
+        const isNewBest = ratio > previousBest;
+        if (isNewBest) subjState.bestScores[session.mode] = ratio;
+        subjState.quizSessions.push({
+            mode: session.mode,
+            score: totalAchieved,
+            total: totalMarks,
+            date: new Date().toISOString()
+        });
+        ep.finished = true;
+        ep.completedAt = new Date().toISOString();
+        ep.lastScore = ratio;
+        ep.lastCorrect = totalAchieved;
+        ep.lastTotal = totalMarks;
+
+        // Time used
+        const timeMs = (ep.timer && ep.timer.elapsedMs) || 0;
+        const tm = Math.floor(timeMs / 60000);
+        const ts = Math.floor((timeMs % 60000) / 1000);
+        const durationMin = ep.timer ? Math.floor(ep.timer.durationMs / 60000) : 60;
+        const autoSubmitted = ep.timer && ep.timer.autoSubmitted;
+        saveState();
+
+        // Render the report
+        const grade = gradeFor(ratio);
+        const reviewItems = session.questions.map((q, i) => renderReportItem(q, i, session.answers[keyOf(q)] || {})).join("");
+
+        root.innerHTML = `
+            <section class="exam-report is-mock grade-${grade.letter.toLowerCase()}">
+                ${ratio >= 0.9 ? renderConfetti() : ""}
+                <div class="results-cat-wrap">
+                    <div class="results-cat">${window.Cats.svg(window.Cats.celebrate(ratio).expression, window.Cats.pickTheme())}</div>
+                    ${isNewBest ? `<div class="new-best-badge">🏆 NEW BEST!</div>` : ""}
+                </div>
+                <div class="results-headline">
+                    <div class="mock-stamp">📝 ${escapeHtml(session.exam ? session.exam.name : "Mock Exam")} · Exam Report</div>
+                    <h1 class="ceremony-title">${isNewBest ? "🏆 New personal best!" : "Exam complete"}</h1>
+                    <p class="ceremony-sub">${autoSubmitted ? "Time ran out — auto-submitted." : "Submitted by you."} You used <strong>${tm}:${String(ts).padStart(2, "0")}</strong> of ${durationMin}:00.</p>
+                </div>
+
+                <div class="report-summary">
+                    <div class="report-card">
+                        <div class="report-card-label">Multiple choice (auto-graded)</div>
+                        <div class="report-card-value">${mcqCorrect} / ${mcqMarks}</div>
+                    </div>
+                    <div class="report-card">
+                        <div class="report-card-label">Written (AI-suggested)</div>
+                        <div class="report-card-value">${writtenAchieved} / ${writtenMax}</div>
+                    </div>
+                    <div class="report-card report-card-total">
+                        <div class="report-card-label">Estimated total</div>
+                        <div class="report-card-value">${totalAchieved} / ${totalMarks}</div>
+                        <div class="report-card-pct">${Math.round(ratio * 100)}%</div>
+                    </div>
+                </div>
+
+                <div class="results-actions">
+                    <a class="primary-btn pulse-btn" href="#/subject/${session.subjectId}/quiz/${session.mode}">🔁 Retake</a>
+                    <a class="ghost-btn" href="#/subject/${session.subjectId}">← Back to ${escapeHtml(subj.name)}</a>
+                    <a class="ghost-btn" href="#/">🏠 Home</a>
+                </div>
+
+                <details class="results-detail" open>
+                    <summary>📋 Detailed report</summary>
+                    <ol class="report-list">${reviewItems}</ol>
+                </details>
+            </section>
+        `;
+
+        // Wire override toggles for the per-question "I got this right"
+        $$(".report-override-toggle").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const qkey = btn.dataset.qkey;
+                const a = session.answers[qkey];
+                if (!a) return;
+                a.correct = !a.correct;
+                ep.answers[qkey] = Object.assign({}, a);
+                saveState();
+                // Re-render the report so totals update
+                renderExamReport(root);
+            });
+        });
+    }
+
+    function renderReportItem(q, i, a) {
+        const isMcq = !!q.options;
+        const correct = !!a.correct;
+        const k = keyOf(q);
+        if (isMcq) {
+            const userIdx = a.user;
+            const userTxt = userIdx != null && q.options[userIdx] ? escapeHtml(q.options[userIdx]) : "<em>No answer</em>";
+            return `<li class="${correct ? "good" : "bad"}">
+                <div class="review-q"><span class="review-num">Q${i + 1}.</span> ${renderText(q.q)}</div>
+                <div class="review-user">Your answer: ${userTxt}</div>
+                <div class="review-correct">Correct: ${escapeHtml(q.options[q.answer])}</div>
+                ${q.explain ? `<div class="review-explain">${renderText(q.explain)}</div>` : ""}
+            </li>`;
+        }
+        // Written
+        const max = q.marks || 4;
+        const ai = a.aiFeedback;
+        const aiBlock = ai ? renderAIFeedback(ai, max) : `<div class="ai-feedback-card ai-partial"><strong>No AI feedback</strong> — add a Gemini key in Settings to enable AI marking.</div>`;
+        return `<li class="${correct ? "good" : "bad"}">
+            <div class="review-q"><span class="review-num">Q${i + 1}.</span> ${renderText(q.q)} <span class="review-marks">[${max} marks]</span></div>
+            <div class="review-user">Your response: <em>${escapeHtml((a.userText || "").slice(0, 600))}${(a.userText || "").length > 600 ? "…" : ""}</em></div>
+            ${aiBlock}
+            <div class="report-override">
+                <button type="button" class="ghost-btn report-override-toggle" data-qkey="${k}">${correct ? "✓ Marked correct (override AI)" : "I think I got this right"}</button>
+            </div>
+            ${q.sample ? `<details class="review-sample-collapsible"><summary>Sample / marker's notes</summary><p>${renderText(q.sample)}</p></details>` : ""}
+        </li>`;
     }
 
     function gradeFor(ratio) {
@@ -1808,7 +2391,199 @@
         if (m) m.remove();
     }
 
+    /* ---------- Custom name ---------- */
+
+    function customName() {
+        return (state.settings && state.settings.customName) || "Harper";
+    }
+
+    function applyCustomName() {
+        const name = customName();
+        document.querySelectorAll("[data-name]").forEach(el => { el.textContent = name; });
+    }
+
+    /* ---------- Settings page ---------- */
+
+    function renderSettings(root) {
+        const s = state.settings || {};
+        const hasKey = !!s.geminiApiKey;
+        const cs = state.clan || { cats: [] };
+        const totalAnswered = state.stats.totalAnswered;
+        const catCount = (cs.cats || []).length;
+        const lastBackup = s.lastBackupISO ? new Date(s.lastBackupISO).toLocaleString() : "never";
+
+        root.innerHTML = `
+            <a class="back-link" href="#/">← Home</a>
+            <header class="settings-header">
+                <h1>⚙️ Settings</h1>
+                <p>Personalise your study guide and back up your progress.</p>
+            </header>
+
+            <section class="settings-section">
+                <h2>👤 Profile</h2>
+                <label class="settings-field">
+                    <span>Your name</span>
+                    <input type="text" id="settings-name" value="${escapeHtml(s.customName || "Harper")}" maxlength="24" placeholder="Harper">
+                </label>
+                <p class="settings-help">Used in greetings on the home page and the brand bar at the top. Cat backstories aren't changed.</p>
+            </section>
+
+            <section class="settings-section">
+                <h2>🤖 AI assistance (Gemini)</h2>
+                <p class="settings-help">A Google Gemini API key enables AI-powered marking and feedback on written answers. The key stays in your browser only — it's never sent anywhere except Google's API.</p>
+                <label class="settings-field">
+                    <span>Gemini API key</span>
+                    <div class="settings-key-row">
+                        <input type="password" id="settings-key" value="${escapeHtml(s.geminiApiKey || "")}" placeholder="paste your key here" autocomplete="off">
+                        <button type="button" class="ghost-btn" id="settings-key-show">👁 Show</button>
+                    </div>
+                </label>
+                <div class="settings-actions">
+                    <button type="button" class="primary-btn" id="settings-save-key">Save key</button>
+                    <button type="button" class="ghost-btn" id="settings-test-key" ${hasKey ? "" : "disabled"}>Test connection</button>
+                    <button type="button" class="ghost-btn" id="settings-clear-key">Remove key</button>
+                </div>
+                <p class="settings-key-status" id="settings-key-status" aria-live="polite">${hasKey ? "✅ Key saved." : "No key saved — AI features are disabled."}</p>
+                <p class="settings-help">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</p>
+            </section>
+
+            <section class="settings-section">
+                <h2>💾 Backup &amp; restore</h2>
+                <p class="settings-help">Save a complete snapshot of your progress (cats, scores, answers, settings) to a JSON file you can keep or move to another device.</p>
+                <div class="settings-actions">
+                    <button type="button" class="primary-btn" id="settings-save-state">💾 Save state to file</button>
+                    <button type="button" class="ghost-btn" id="settings-load-state">📂 Load state from file</button>
+                </div>
+                <p class="settings-help">Right now you have <strong>${totalAnswered}</strong> questions answered and <strong>${catCount}</strong> cat${catCount === 1 ? "" : "s"}. Last backup: ${escapeHtml(lastBackup)}.</p>
+            </section>
+
+            <section class="settings-section settings-danger">
+                <h2>⚠️ Danger zone</h2>
+                <button type="button" class="reset-modal-go" id="settings-reset">Reset all progress…</button>
+            </section>
+        `;
+
+        $("#settings-name").addEventListener("blur", (e) => {
+            state.settings.customName = (e.target.value || "Harper").trim().slice(0, 24) || "Harper";
+            saveState();
+            applyCustomName();
+        });
+
+        const keyInput = $("#settings-key");
+        $("#settings-key-show").addEventListener("click", () => {
+            keyInput.type = keyInput.type === "password" ? "text" : "password";
+        });
+        $("#settings-save-key").addEventListener("click", () => {
+            state.settings.geminiApiKey = (keyInput.value || "").trim();
+            saveState();
+            $("#settings-key-status").textContent = state.settings.geminiApiKey
+                ? "✅ Key saved."
+                : "No key saved — AI features are disabled.";
+            $("#settings-test-key").disabled = !state.settings.geminiApiKey;
+        });
+        $("#settings-clear-key").addEventListener("click", () => {
+            state.settings.geminiApiKey = "";
+            keyInput.value = "";
+            saveState();
+            $("#settings-key-status").textContent = "Key removed — AI features are disabled.";
+            $("#settings-test-key").disabled = true;
+        });
+        $("#settings-test-key").addEventListener("click", async () => {
+            const status = $("#settings-key-status");
+            status.textContent = "Testing connection…";
+            try {
+                const ok = await window.AI.testKey(state.settings.geminiApiKey);
+                status.textContent = ok ? "✅ Key works!" : "❌ Key did not work — double-check it.";
+            } catch (e) {
+                status.textContent = "❌ " + (e.message || "Network error");
+            }
+        });
+
+        $("#settings-save-state").addEventListener("click", saveStateToFile);
+        $("#settings-load-state").addEventListener("click", loadStateFromFile);
+        $("#settings-reset").addEventListener("click", showResetWarning);
+    }
+
+    function saveStateToFile() {
+        const today = new Date().toISOString().slice(0, 10);
+        const filename = `${customName().toLowerCase()}-studyguide-${today}.json`;
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        state.settings.lastBackupISO = new Date().toISOString();
+        saveState();
+        window.Cats.popIn({ expression: "wave", message: "Backup saved!", duration: 2400 });
+    }
+
+    function loadStateFromFile() {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json,.json";
+        input.onchange = (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                let parsed;
+                try { parsed = JSON.parse(reader.result); }
+                catch (err) { alert("That file isn't valid JSON."); return; }
+                if (!parsed || typeof parsed !== "object" || !parsed.subjects) {
+                    alert("That file doesn't look like a study-guide backup.");
+                    return;
+                }
+                showLoadConfirm(parsed);
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    function showLoadConfirm(loaded) {
+        const existing = document.getElementById("reset-modal");
+        if (existing) existing.remove();
+        const modal = document.createElement("div");
+        modal.id = "reset-modal";
+        modal.className = "reset-modal-overlay";
+        modal.innerHTML = `
+            <div class="reset-modal" role="dialog" aria-modal="true">
+                <div class="reset-modal-icon">📂</div>
+                <h2>Replace your progress with this file?</h2>
+                <p class="reset-modal-lead">Loading this file will <strong>overwrite all your current progress</strong>: cats, exam scores, settings, the lot. Make sure you've backed up first if you want to keep anything.</p>
+                <label class="reset-modal-confirm">
+                    <input type="checkbox" id="load-modal-check">
+                    <span>I understand this replaces my current progress.</span>
+                </label>
+                <div class="reset-modal-actions">
+                    <button type="button" class="ghost-btn" id="load-modal-cancel">Cancel</button>
+                    <button type="button" class="reset-modal-go" id="load-modal-confirm" disabled>Yes, load this file</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const checkBox = document.getElementById("load-modal-check");
+        const goBtn = document.getElementById("load-modal-confirm");
+        checkBox.addEventListener("change", () => { goBtn.disabled = !checkBox.checked; });
+        document.getElementById("load-modal-cancel").addEventListener("click", closeResetModal);
+        modal.addEventListener("click", (e) => { if (e.target === modal) closeResetModal(); });
+        goBtn.addEventListener("click", () => {
+            state = migrateState(Object.assign(defaultState(), loaded));
+            saveState();
+            closeResetModal();
+            applyCustomName();
+            render();
+            window.Cats.popIn({ expression: "cheering", message: "Progress restored!", duration: 3000 });
+        });
+        setTimeout(() => document.getElementById("load-modal-cancel").focus(), 50);
+    }
+
     generatePracticeExams();
     bindGlobalEvents();
+    applyCustomName();
     if (document.readyState !== "loading") render();
 })();

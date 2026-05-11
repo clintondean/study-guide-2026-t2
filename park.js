@@ -40,6 +40,15 @@
     let dragRef = null;
     let endsAt = null;    // optional time-limit
     let onExit = null;    // function to call when leaving the park
+    let backHref = "#/clan";
+    let parkTitle = "🌿 Park Visit";
+    let parkBlurb = "Tap a cat to pick them up. Click an action to make all cats react. Have fun!";
+    let parkHelp = "Drag a cat by clicking and holding. Each cat has its own personality - watch how they react!";
+    let renderPetSvg = null;
+    let resolvePet = null;
+    let getPetId = null;
+    let getPetName = null;
+    let reactionPhrase = null;
 
     /* ---------- Public API ---------- */
 
@@ -47,6 +56,18 @@
         opts = opts || {};
         onExit = opts.onExit || null;
         endsAt = opts.endsAt || null;
+        backHref = opts.backHref || "#/clan";
+        parkTitle = opts.title || "🌿 Park Visit";
+        parkBlurb = opts.blurb || "Tap a cat to pick them up. Click an action to make all cats react. Have fun!";
+        parkHelp = opts.help || "Drag a cat by clicking and holding. Each cat has its own personality - watch how they react!";
+        renderPetSvg = opts.renderPet || function (entry, expression) {
+            const breed = window.Clan.findBreed(entry.breedId);
+            return breed ? window.Cats.breedSvg(breed.appearance, expression) : "";
+        };
+        resolvePet = opts.resolvePet || function (entry) { return window.Clan.findBreed(entry.breedId); };
+        getPetId = opts.getPetId || function (entry) { return entry.breedId; };
+        getPetName = opts.getPetName || function (entry, breed) { return entry.name || (breed && breed.defaultName) || "Cat"; };
+        reactionPhrase = opts.reactionPhrase || function (petId, kind) { return window.Clan.reactionPhrase(petId, kind); };
         renderShell(rootEl);
         spawnCats(selectedCats);
         spawnFlutters();
@@ -65,10 +86,10 @@
 
     function renderShell(rootEl) {
         rootEl.innerHTML = `
-            <a class="back-link" id="park-exit-link" href="#/clan">← Back to Clan</a>
+            <a class="back-link" id="park-exit-link" href="${backHref}">← Back to Pets</a>
             <header class="park-header">
-                <h1>🌿 Park Visit</h1>
-                <p class="park-blurb">Tap a cat to pick them up. Click an action to make all cats react. Have fun!</p>
+                <h1>${escapeHtml(parkTitle)}</h1>
+                <p class="park-blurb">${escapeHtml(parkBlurb)}</p>
             </header>
             <div class="park-actions">
                 <button type="button" class="action-btn" data-park="pet">🤚 Pet All</button>
@@ -84,7 +105,7 @@
                     ${renderFlutters()}
                 </div>
             </div>
-            <p class="park-help">Drag a cat by clicking and holding. Each cat has its own personality — watch how they react!</p>
+            <p class="park-help">${escapeHtml(parkHelp)}</p>
         `;
         stage = document.getElementById("park-stage");
 
@@ -113,13 +134,13 @@
     function spawnCats(selectedCats) {
         // selectedCats: array of { breedId, name, ... } from clan state
         cats = selectedCats.slice(0, 5).map((c, i) => {
-            const breed = window.Clan.findBreed(c.breedId);
+            const breed = resolvePet(c);
             if (!breed) return null;
             const startX = 100 + i * 150;
             const startY = PARK_H - 120;
             const obj = {
-                catId: c.breedId,
-                name: c.name || breed.defaultName,
+                catId: getPetId(c),
+                name: getPetName(c, breed),
                 breed,
                 x: startX, y: startY,
                 facing: 1,
@@ -134,7 +155,7 @@
             wrap.style.top = startY + "px";
             wrap.style.transition = `left ${MOVE_MS}ms ease-in-out, top ${MOVE_MS}ms ease-in-out`;
             wrap.innerHTML = `
-                <div class="park-cat-svg">${window.Cats.breedSvg(breed.appearance, "wave")}</div>
+                <div class="park-cat-svg">${renderPetSvg(c, "wave")}</div>
                 <div class="park-cat-name">${escapeHtml(obj.name)}</div>
             `;
             // Drag handlers
@@ -210,7 +231,7 @@
         wrap.setPointerCapture(e.pointerId);
         // Show happy expression
         const inner = wrap.querySelector(".park-cat-svg");
-        if (inner) inner.innerHTML = window.Cats.breedSvg(cat.breed.appearance, "happy");
+        if (inner) inner.innerHTML = renderPetSvg({ breedId: cat.catId, petId: cat.catId, name: cat.name, appearance: cat.breed.appearance }, "happy");
 
         wrap.addEventListener("pointermove", onDragMove);
         wrap.addEventListener("pointerup", onDragEnd);
@@ -247,10 +268,10 @@
         // Restore expression after a beat
         setTimeout(() => {
             const inner = wrap.querySelector(".park-cat-svg");
-            if (inner) inner.innerHTML = window.Cats.breedSvg(cat.breed.appearance, "wave");
+            if (inner) inner.innerHTML = renderPetSvg({ breedId: cat.catId, petId: cat.catId, name: cat.name, appearance: cat.breed.appearance }, "wave");
         }, 800);
         // Show a quick speech bubble
-        showCatSpeech(cat, window.Clan.reactionPhrase(cat.catId, "pet"));
+        showCatSpeech(cat, reactionPhrase(cat.catId, "pet"));
         dragRef = null;
     }
 
@@ -265,7 +286,7 @@
         if (kind === "pet") {
             cats.forEach(cat => {
                 playExpression(cat, "love", 1500);
-                showCatSpeech(cat, window.Clan.reactionPhrase(cat.catId, "pet"));
+                showCatSpeech(cat, reactionPhrase(cat.catId, "pet"));
             });
             return;
         }
@@ -282,7 +303,7 @@
             cats.forEach((cat, i) => {
                 moveCat(cat, newX + (i - 2) * 40, newY + 60);
                 playExpression(cat, "cheering", 1500);
-                showCatSpeech(cat, window.Clan.reactionPhrase(cat.catId, "play"));
+                showCatSpeech(cat, reactionPhrase(cat.catId, "play"));
             });
             return;
         }
@@ -292,7 +313,7 @@
             cats.forEach((cat, i) => {
                 moveCat(cat, bowl.x + (i - 2) * 30, bowl.y + 60);
                 playExpression(cat, "happy", 1500);
-                showCatSpeech(cat, window.Clan.reactionPhrase(cat.catId, "treat"));
+                showCatSpeech(cat, reactionPhrase(cat.catId, "treat"));
             });
             return;
         }
@@ -301,7 +322,7 @@
             cats.forEach((cat, i) => {
                 moveCat(cat, PARK_W / 2 + (i - 2) * 80, PARK_H - 130);
                 playExpression(cat, "wave", 1200);
-                showCatSpeech(cat, window.Clan.reactionPhrase(cat.catId, "chat"));
+                showCatSpeech(cat, reactionPhrase(cat.catId, "chat"));
             });
             return;
         }
@@ -315,12 +336,12 @@
     function playExpression(cat, expr, ms) {
         const inner = cat.el.querySelector(".park-cat-svg");
         if (inner) {
-            inner.innerHTML = window.Cats.breedSvg(cat.breed.appearance, expr);
+            inner.innerHTML = renderPetSvg({ breedId: cat.catId, petId: cat.catId, name: cat.name, appearance: cat.breed.appearance }, expr);
             inner.classList.add("park-cat-pulse");
         }
         setTimeout(() => {
             if (inner) {
-                inner.innerHTML = window.Cats.breedSvg(cat.breed.appearance, "wave");
+                inner.innerHTML = renderPetSvg({ breedId: cat.catId, petId: cat.catId, name: cat.name, appearance: cat.breed.appearance }, "wave");
                 inner.classList.remove("park-cat-pulse");
             }
         }, ms || 1200);

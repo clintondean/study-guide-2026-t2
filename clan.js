@@ -222,7 +222,7 @@
             origin: "Canada",
             defaultName: "Pebble",
             altNames: ["Wrinkles", "Sphynxie", "Naked", "Goblin"],
-            rarity: "rare",
+            rarity: "ultra-rare",
             appearance: { primary: "#f0c8b4", secondary: "#fad7c4", accent: "#c89882", eyeColor: "#3da9fc", pattern: "solid", fluff: "hairless", earStyle: "big", tail: "long" },
             archetype: "Eccentric Genius",
             traits: ["Warm", "Affectionate", "Weird"],
@@ -260,7 +260,7 @@
             origin: "Norway",
             defaultName: "Loki",
             altNames: ["Freya", "Bjorn", "Saga", "Frost"],
-            rarity: "rare",
+            rarity: "ultra-rare",
             appearance: { primary: "#a0876b", secondary: "#e0c8a8", accent: "#5a3a22", eyeColor: "#9bc53d", pattern: "stripes", fluff: "long", earStyle: "tufted", tail: "long" },
             archetype: "Viking Adventurer",
             traits: ["Hardy", "Climbs anything", "Independent"],
@@ -298,7 +298,7 @@
             origin: "USA",
             defaultName: "Dumpling",
             altNames: ["Stubby", "Noodle", "Tot", "Bean"],
-            rarity: "rare",
+            rarity: "ultra-rare",
             appearance: { primary: "#e0c8a8", secondary: "#fff4e0", accent: "#a0876b", eyeColor: "#3da9fc", pattern: "stripes", fluff: "medium", earStyle: "normal", tail: "long" },
             archetype: "Tiny Mischief-Maker",
             traits: ["Short legs", "Big personality", "Speedy"],
@@ -317,7 +317,7 @@
             origin: "Turkey (Lake Van region)",
             defaultName: "Lake",
             altNames: ["Marble", "Pasha", "Anya", "Splash"],
-            rarity: "rare",
+            rarity: "ultra-rare",
             appearance: { primary: "#fff", secondary: "#f5f5f5", accent: "#c47a4a", eyeColor: "#f0a500", pattern: "calico", fluff: "long", earStyle: "normal", tail: "long", calicoColors: ["#c47a4a", "#3a2818"] },
             archetype: "Swimmer",
             traits: ["Loves water", "Strong", "Loyal"],
@@ -336,7 +336,7 @@
             origin: "England (Devon)",
             defaultName: "Pixie",
             altNames: ["Elf", "Goblin", "Sprite", "Mochi"],
-            rarity: "rare",
+            rarity: "legendary",
             appearance: { primary: "#bda58a", secondary: "#dccaa8", accent: "#7a6650", eyeColor: "#5fcfbf", pattern: "solid", fluff: "short", earStyle: "big", tail: "long" },
             archetype: "Pixie",
             traits: ["Curly fur", "Big ears", "Goofball"],
@@ -625,11 +625,36 @@
         return BREEDS.find(b => b.id === id);
     }
 
-    // Pick 3 candidates from breeds Harper hasn't unlocked yet (or all if fewer)
+    const CLAIM_CANDIDATE_COUNT = 6;
+    const RARITY_WEIGHTS = {
+        common: 12,
+        uncommon: 8,
+        rare: 4,
+        "ultra-rare": 2,
+        legendary: 1
+    };
+
+    function weightedPickIndex(pool) {
+        const total = pool.reduce((sum, breed) => sum + (RARITY_WEIGHTS[breed.rarity] || 1), 0);
+        let roll = Math.random() * total;
+        for (let i = 0; i < pool.length; i++) {
+            roll -= (RARITY_WEIGHTS[pool[i].rarity] || 1);
+            if (roll <= 0) return i;
+        }
+        return pool.length - 1;
+    }
+
     function pickCandidates(unlockedIds) {
         const available = BREEDS.filter(b => !unlockedIds.includes(b.id));
         if (available.length === 0) return [];
-        return shuffle(available).slice(0, Math.min(3, available.length));
+        const pool = available.slice();
+        const picks = [];
+        while (pool.length && picks.length < Math.min(CLAIM_CANDIDATE_COUNT, available.length)) {
+            const idx = weightedPickIndex(pool);
+            picks.push(pool[idx]);
+            pool.splice(idx, 1);
+        }
+        return shuffle(picks);
     }
 
     function totalBreeds() { return BREEDS.length; }

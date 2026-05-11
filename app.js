@@ -1,16 +1,45 @@
-// Harper's Study Guide — single-page app shell, router, quiz engine, state.
+// Study Guide — single-page app shell, router, quiz engine, state.
 // All data is read from window.SUBJECT_DATA which is populated by data/*.js.
 
 (function () {
     "use strict";
 
     const STORAGE_KEY = "harper-studyguide-v1";
-    const SUBJECTS = ["commerce", "english", "geography", "maths"];
+    const STATE_SUBJECTS = Object.keys(window.SUBJECT_DATA || {});
     const PRACTICE_EXAMS_PER_TOPIC = 10;
     const PRACTICE_QS_PER_EXAM = 20;
     const PRACTICE_MCQ = 14;
     const PRACTICE_SA = 5;
     const PRACTICE_LA = 1;
+    const YEAR_LEVELS = [
+        {
+            id: "year-7",
+            label: "Year 7",
+            blurb: "Build your study list for Year 7.",
+            subjects: [
+                { id: "science" },
+                { id: "maths-core" },
+                { id: "geography-7" },
+                { id: "music-7" }
+            ]
+        },
+        {
+            id: "year-9",
+            label: "Year 9",
+            blurb: "Choose the subjects you want to practise right now.",
+            subjects: [
+                { id: "commerce" },
+                { id: "english" },
+                { id: "geography" },
+                { id: "maths" },
+                { id: "science-9" }
+            ]
+        }
+    ];
+    const YEAR_BY_ID = YEAR_LEVELS.reduce((out, year) => {
+        out[year.id] = year;
+        return out;
+    }, Object.create(null));
 
     /* ---------- Practice exam generator (deterministic) ---------- */
 
@@ -47,7 +76,7 @@
     }
 
     function generatePracticeExams() {
-        SUBJECTS.forEach(subjectId => {
+        STATE_SUBJECTS.forEach(subjectId => {
             const subj = window.SUBJECT_DATA[subjectId];
             if (!subj || !Array.isArray(subj.practiceTopics)) return;
             const mcqsByTopic = groupBy(subj.mcqs || [], q => q.topic);
@@ -104,7 +133,7 @@
 
     function defaultState() {
         const subjects = {};
-        SUBJECTS.forEach(s => {
+        STATE_SUBJECTS.forEach(s => {
             subjects[s] = {
                 attempts: {},        // questionId -> { answer, correct, attempts }
                 quizSessions: [],    // [{ mode, score, total, date, topicId }]
@@ -118,14 +147,28 @@
             subjects,
             settings: {
                 reducedMotion: false,
-                customName: "Harper",     // shown in greetings/headers
-                geminiApiKey: ""          // empty = AI features disabled
+                customName: "",           // shown in greetings/headers after onboarding
+                geminiApiKey: "",         // empty = AI features disabled
+                selectedYear: "",
+                selectedSubjects: [],
+                themePreference: "cats"
             },
             stats: { totalAnswered: 0, totalCorrect: 0, currentStreak: 0, bestStreak: 0 },
             clan: {
                 cats: [],
                 claimTickets: 0,
                 perfectExams: {}
+            },
+            animals: {
+                pets: [],
+                claimTickets: 0,
+                perfectExams: {},
+                parkSelection: [],
+                sparklePotions: 0
+            },
+            hybrids: {
+                cats: [],
+                animals: []
             },
             breaks: {
                 lastBreakStartISO: null,
@@ -145,7 +188,7 @@
             if (s.settings[k] === undefined) s.settings[k] = def.settings[k];
         }
         if (!s.subjects) s.subjects = def.subjects;
-        for (const subjId of SUBJECTS) {
+        for (const subjId of STATE_SUBJECTS) {
             if (!s.subjects[subjId]) s.subjects[subjId] = def.subjects[subjId];
             const sub = s.subjects[subjId];
             if (!sub.examProgress) sub.examProgress = {};
@@ -153,7 +196,17 @@
             if (!sub.quizSessions) sub.quizSessions = [];
             if (!sub.bestScores) sub.bestScores = {};
         }
+        s.settings.selectedYear = normalizeYearId(s.settings.selectedYear);
+        s.settings.selectedSubjects = normalizeSelectedSubjects(s.settings.selectedYear, s.settings.selectedSubjects);
         if (!s.clan) s.clan = def.clan;
+        if (!s.animals) s.animals = def.animals;
+        if (!Array.isArray(s.animals.pets)) s.animals.pets = [];
+        if (!s.animals.perfectExams) s.animals.perfectExams = {};
+        if (!Array.isArray(s.animals.parkSelection)) s.animals.parkSelection = [];
+        if (typeof s.animals.sparklePotions !== "number") s.animals.sparklePotions = 0;
+        if (!s.hybrids) s.hybrids = def.hybrids;
+        if (!Array.isArray(s.hybrids.cats)) s.hybrids.cats = [];
+        if (!Array.isArray(s.hybrids.animals)) s.hybrids.animals = [];
         if (!s.breaks) s.breaks = def.breaks;
         if (!s.stats) s.stats = def.stats;
         return s;
@@ -197,6 +250,39 @@
         return escapeHtml(s).replace(/\n/g, "<br>");
     }
 
+    function normalizeRarity(rarity) {
+        const value = String(rarity || "").toLowerCase();
+        if (value === "ultra rare") return "ultra-rare";
+        return value || "common";
+    }
+
+    function rarityLabel(rarity) {
+        const value = normalizeRarity(rarity);
+        if (value === "ultra-rare") return "Ultra-rare";
+        return value.charAt(0).toUpperCase() + value.slice(1);
+    }
+
+    function renderRarityBadge(rarity) {
+        const value = normalizeRarity(rarity);
+        return `<span class="rarity-badge rarity-${value}">${escapeHtml(rarityLabel(value))}</span>`;
+    }
+
+    function renderQuestionDiagram(diagram) {
+        if (!diagram || !diagram.svg) return "";
+        const alt = diagram.alt || diagram.caption || "Question diagram";
+        return `
+            <figure class="question-diagram">
+                <div class="question-diagram-art" role="img" aria-label="${escapeHtml(alt)}">${diagram.svg}</div>
+                ${(diagram.caption || diagram.alt) ? `<figcaption>${escapeHtml(diagram.caption || diagram.alt)}</figcaption>` : ""}
+            </figure>
+        `;
+    }
+
+    function questionTextForAI(q) {
+        if (!q || !q.diagram || !q.diagram.alt) return q ? q.q : "";
+        return `${q.q}\n\nDiagram provided: ${q.diagram.alt}`;
+    }
+
     function shuffle(arr) {
         const a = arr.slice();
         for (let i = a.length - 1; i > 0; i--) {
@@ -209,6 +295,409 @@
     function pct(num, denom) {
         if (!denom) return 0;
         return Math.round((num / denom) * 100);
+    }
+
+    function normalizeYearId(yearId) {
+        return YEAR_BY_ID[yearId] ? yearId : "";
+    }
+
+    function yearConfig(yearId) {
+        return YEAR_BY_ID[normalizeYearId(yearId)] || null;
+    }
+
+    function yearLabel(yearId) {
+        const year = yearConfig(yearId);
+        return year ? year.label : "";
+    }
+
+    function subjectOptionsForYear(yearId) {
+        const year = yearConfig(yearId);
+        return year ? year.subjects.slice() : [];
+    }
+
+    function defaultSelectedSubjectsForYear(yearId) {
+        return subjectOptionsForYear(yearId).map(subject => subject.id);
+    }
+
+    function normalizeSelectedSubjectId(yearId, subjectId) {
+        if (yearId === "year-7" && subjectId === "maths") return "maths-core";
+        return subjectId;
+    }
+
+    function normalizeSelectedSubjects(yearId, subjectIds) {
+        const valid = new Set(defaultSelectedSubjectsForYear(yearId));
+        const seen = new Set();
+        return (Array.isArray(subjectIds) ? subjectIds : []).map(id => normalizeSelectedSubjectId(yearId, id)).filter(id => {
+            if (!valid.has(id) || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+    }
+
+    function isMathsSubject(subjectId) {
+        return subjectId === "maths" || subjectId === "maths-core";
+    }
+
+    function currentSelectedYear() {
+        return normalizeYearId(state.settings && state.settings.selectedYear);
+    }
+
+    function currentSelectedSubjects() {
+        return normalizeSelectedSubjects(currentSelectedYear(), state.settings && state.settings.selectedSubjects);
+    }
+
+    function savedCustomName() {
+        return ((state.settings && state.settings.customName) || "").trim().slice(0, 24);
+    }
+
+    function hasStudyProfile() {
+        return !!currentSelectedYear() && currentSelectedSubjects().length > 0;
+    }
+
+    function normalizeThemePreference(themeId) {
+        return themeId === "animals" ? "animals" : "cats";
+    }
+
+    function currentThemeId() {
+        return normalizeThemePreference(state.settings && state.settings.themePreference);
+    }
+
+    function themeApi(themeId) {
+        return normalizeThemePreference(themeId) === "animals" ? window.Animals : window.Cats;
+    }
+
+    function activeMascotApi() {
+        return themeApi(currentThemeId());
+    }
+
+    function mascotSvgForTheme(themeId, expression, theme) {
+        const api = themeApi(themeId);
+        const pickedTheme = theme || (api.pickTheme ? api.pickTheme() : null);
+        return api.svg(expression, pickedTheme);
+    }
+
+    function mascotSvg(expression, theme) {
+        return mascotSvgForTheme(currentThemeId(), expression, theme);
+    }
+
+    function mascotPopIn(opts) {
+        activeMascotApi().popIn(opts || {});
+    }
+
+    function mascotCelebrate(scoreRatio) {
+        return activeMascotApi().celebrate(scoreRatio);
+    }
+
+    function activeThemeConfig() {
+        return currentThemeId() === "animals"
+            ? {
+                id: "animals",
+                label: "Animals",
+                ticketLabel: "Pet Ticket",
+                collectionLabel: "Pet Haven",
+                collectionActionLabel: "Claim pet",
+                itemSingular: "pet",
+                itemPlural: "pets",
+                detailRoute: "pet",
+                emptyTitle: "Your pet haven is waiting!",
+                emptySummary: "Score 100% on any practice set or mock exam to earn a 🎟️ Pet Ticket. Spend the ticket to choose a new pet for your haven.",
+                heading: `${customName()}'s Pet Haven`,
+                progressLabel: "pets collected",
+                parkCta: "🌿 Visit the Meadow",
+                parkSub: "(take up to 5 pets)",
+                parkTitle: "🌿 Visit the Meadow",
+                parkLead: "Pick up to 5 pets to take with you.",
+                parkGo: "Off to the Meadow! 🐾",
+                claimTitle: "🎟️ Choose your new pet!",
+                claimIntro: "Three adorable pets wandered into your haven. Pick one - the others will scamper off for now.",
+                claimButton: name => `I choose you, ${name}!`,
+                claimWelcome: name => `Welcome to the haven, ${name}!`,
+                claimCelebrate: "Your pet haven grows!",
+                noTickets: "No tickets yet! Score 100% on any quiz to earn one.",
+                allCollected: `You've collected every pet! Legendary work, ${customName()}.`,
+                progressCta: "🐾 My Pets"
+            }
+            : {
+                id: "cats",
+                label: "Cats",
+                ticketLabel: "Cat Ticket",
+                collectionLabel: "Cat Clan",
+                collectionActionLabel: "Claim cat",
+                itemSingular: "cat",
+                itemPlural: "cats",
+                detailRoute: "cat",
+                emptyTitle: "Your cat clan is waiting!",
+                emptySummary: "Score 100% on any practice set or mock exam to earn a 🎟️ Cat Ticket. Spend the ticket to choose a new cat for your clan.",
+                heading: `${customName()}'s Cat Clan`,
+                progressLabel: "cats collected",
+                parkCta: "🌿 Visit the Park",
+                parkSub: "(take up to 5 cats)",
+                parkTitle: "🌿 Visit the Park",
+                parkLead: "Pick up to 5 cats to take with you.",
+                parkGo: "Off to the Park! 🐾",
+                claimTitle: "🎟️ Choose your new cat!",
+                claimIntro: "Three cats wandered into your clan. Pick one - the others will scamper off.",
+                claimButton: name => `I choose you, ${name}!`,
+                claimWelcome: name => `Welcome to the clan, ${name}!`,
+                claimCelebrate: "Your clan grows!",
+                noTickets: "No tickets yet! Score 100% on any quiz to earn one.",
+                allCollected: `You've collected every breed! Legendary work, ${customName()}.`,
+                progressCta: "🐾 My Pets"
+            };
+    }
+
+    function animalsState() {
+        if (!state.animals) state.animals = { pets: [], claimTickets: 0, perfectExams: {}, parkSelection: [], sparklePotions: 0 };
+        if (!Array.isArray(state.animals.pets)) state.animals.pets = [];
+        if (!state.animals.perfectExams) state.animals.perfectExams = {};
+        if (!Array.isArray(state.animals.parkSelection)) state.animals.parkSelection = [];
+        if (typeof state.animals.sparklePotions !== "number") state.animals.sparklePotions = 0;
+        return state.animals;
+    }
+
+    function hybridState() {
+        if (!state.hybrids) state.hybrids = { cats: [], animals: [] };
+        if (!Array.isArray(state.hybrids.cats)) state.hybrids.cats = [];
+        if (!Array.isArray(state.hybrids.animals)) state.hybrids.animals = [];
+        return state.hybrids;
+    }
+
+    function catHybridEntries() {
+        return hybridState().cats;
+    }
+
+    function animalHybridEntries() {
+        return hybridState().animals;
+    }
+
+    function totalCatCompanions() {
+        return (clanState().cats || []).length + catHybridEntries().length;
+    }
+
+    function totalAnimalCompanions() {
+        return (animalsState().pets || []).length + animalHybridEntries().length;
+    }
+
+    function sparklePotionCount() {
+        return (animalsState().sparklePotions || 0);
+    }
+
+    function catEntryId(entry) {
+        return entry ? (entry.hybridId || entry.breedId) : "";
+    }
+
+    function animalEntryId(entry) {
+        return entry ? (entry.hybridId || entry.petId) : "";
+    }
+
+    function findCatHybridEntry(hybridId) {
+        return catHybridEntries().find(entry => entry.hybridId === hybridId) || null;
+    }
+
+    function findAnimalHybridEntry(hybridId) {
+        return animalHybridEntries().find(entry => entry.hybridId === hybridId) || null;
+    }
+
+    function findOwnedCatEntry(id) {
+        return clanState().cats.find(entry => entry.breedId === id) || findCatHybridEntry(id);
+    }
+
+    function findOwnedAnimalEntry(id) {
+        return animalsState().pets.find(entry => entry.petId === id) || findAnimalHybridEntry(id);
+    }
+
+    function catCompanionEntries() {
+        return (clanState().cats || []).concat(catHybridEntries());
+    }
+
+    function animalCompanionEntries() {
+        return (animalsState().pets || []).concat(animalHybridEntries());
+    }
+
+    function catSpecFor(id) {
+        const hybridEntry = findCatHybridEntry(id);
+        if (hybridEntry) return window.Hybrids.buildCatSpec(hybridEntry.parentIds[0], hybridEntry.parentIds[1]);
+        return window.Clan.findBreed(id);
+    }
+
+    function animalSpecFor(id) {
+        const hybridEntry = findAnimalHybridEntry(id);
+        if (hybridEntry) return window.Hybrids.buildAnimalSpec(hybridEntry.parentIds[0], hybridEntry.parentIds[1], { sparkle: !!hybridEntry.sparkle });
+        return window.Animals.findPet(id);
+    }
+
+    function renderCatArt(id, expression) {
+        const hybridEntry = findCatHybridEntry(id);
+        if (hybridEntry) return window.Hybrids.renderCatHybrid(window.Hybrids.buildCatSpec(hybridEntry.parentIds[0], hybridEntry.parentIds[1]), expression);
+        const breed = window.Clan.findBreed(id);
+        return breed ? window.Cats.breedSvg(breed.appearance, expression) : "";
+    }
+
+    function renderAnimalArt(id, expression) {
+        const hybridEntry = findAnimalHybridEntry(id);
+        if (hybridEntry) return window.Hybrids.renderAnimalHybrid(window.Hybrids.buildAnimalSpec(hybridEntry.parentIds[0], hybridEntry.parentIds[1], { sparkle: !!hybridEntry.sparkle }), expression);
+        const pet = window.Animals.findPet(id);
+        return pet ? window.Animals.petSvg(pet, expression) : "";
+    }
+
+    function catReactionPhraseFor(id, kind) {
+        const hybridEntry = findCatHybridEntry(id);
+        if (hybridEntry) {
+            const spec = window.Hybrids.buildCatSpec(hybridEntry.parentIds[0], hybridEntry.parentIds[1]);
+            return window.Hybrids.reactionPhrase(spec, kind);
+        }
+        return window.Clan.reactionPhrase(id, kind);
+    }
+
+    function animalReactionPhraseFor(id, kind) {
+        const hybridEntry = findAnimalHybridEntry(id);
+        if (hybridEntry) {
+            const spec = window.Hybrids.buildAnimalSpec(hybridEntry.parentIds[0], hybridEntry.parentIds[1], { sparkle: !!hybridEntry.sparkle });
+            return window.Hybrids.reactionPhrase(spec, kind);
+        }
+        return window.Animals.reactionPhrase(id, kind);
+    }
+
+    function renderAnimalVariantBadges(spec) {
+        if (!spec) return "";
+        return `${spec.hybrid ? ` <span class="hybrid-label">Hybrid</span>` : ""}${spec.sparkle ? ` <span class="sparkle-label">Sparkle</span>` : ""}`;
+    }
+
+    function ensureCatHybrid(idA, idB) {
+        const hybridId = window.Hybrids.catId(idA, idB);
+        const existing = findCatHybridEntry(hybridId);
+        if (existing) return { entry: existing, created: false };
+        const spec = window.Hybrids.buildCatSpec(idA, idB);
+        if (!spec) return null;
+        const now = new Date().toISOString();
+        const entry = {
+            hybridId,
+            parentIds: spec.parentIds.slice(),
+            name: spec.defaultName,
+            dateISO: now,
+            lastInteractedISO: now,
+            happiness: 82
+        };
+        catHybridEntries().push(entry);
+        saveState();
+        return { entry, created: true };
+    }
+
+    function ensureAnimalHybrid(idA, idB, opts) {
+        opts = opts || {};
+        const sparkle = !!opts.sparkle;
+        const progress = animalsState();
+        const hybridId = window.Hybrids.animalId(idA, idB, { sparkle });
+        const existing = findAnimalHybridEntry(hybridId);
+        if (existing) return { entry: existing, created: false };
+        if (sparkle && sparklePotionCount() <= 0) return null;
+        const spec = window.Hybrids.buildAnimalSpec(idA, idB, { sparkle });
+        if (!spec) return null;
+        const now = new Date().toISOString();
+        const entry = {
+            hybridId,
+            parentIds: spec.parentIds.slice(),
+            name: spec.defaultName,
+            dateISO: now,
+            lastInteractedISO: now,
+            happiness: 82,
+            sparkle
+        };
+        animalHybridEntries().push(entry);
+        if (sparkle) progress.sparklePotions = Math.max(0, (progress.sparklePotions || 0) - 1);
+        saveState();
+        return { entry, created: true };
+    }
+
+    function collectionStateForTheme(themeId) {
+        return normalizeThemePreference(themeId) === "animals" ? animalsState() : clanState();
+    }
+
+    function totalPendingTickets() {
+        return (clanState().claimTickets || 0) + (animalsState().claimTickets || 0);
+    }
+
+    function setThemePreference(themeId) {
+        state.settings.themePreference = normalizeThemePreference(themeId);
+        saveState();
+        applyFooterCaption();
+    }
+
+    function resolveProfileDraft(draft) {
+        const explicitYear = draft && draft.yearId;
+        const savedYear = currentSelectedYear();
+        const yearId = normalizeYearId(explicitYear) || savedYear || "year-9";
+        const hasExplicitSubjects = !!(draft && Array.isArray(draft.selectedSubjects));
+        const customName = draft && typeof draft.customName === "string"
+            ? draft.customName
+            : savedCustomName();
+        const themePreference = normalizeThemePreference(draft && draft.themePreference ? draft.themePreference : currentThemeId());
+        const selectedSubjects = normalizeSelectedSubjects(
+            yearId,
+            hasExplicitSubjects
+                ? draft.selectedSubjects
+                : (savedYear ? currentSelectedSubjects() : defaultSelectedSubjectsForYear(yearId))
+        );
+        return { yearId, selectedSubjects, customName, themePreference };
+    }
+
+    function subjectEntryForYear(yearId, subjectId) {
+        const option = subjectOptionsForYear(yearId).find(subject => subject.id === subjectId);
+        if (!option) return null;
+        const data = window.SUBJECT_DATA[subjectId];
+        const status = option.status || (data ? "live" : "coming-soon");
+        return {
+            id: subjectId,
+            yearId,
+            yearLabel: yearLabel(yearId),
+            status,
+            data: status === "live" ? data : null,
+            name: option.name || (data && data.name) || subjectId,
+            tagline: option.tagline || (data && data.tagline) || "",
+            icon: option.icon || (data && data.icon) || "📚",
+            color: option.color || (data && data.color) || "#7c8aa5",
+            accent: option.accent || (data && data.accent) || option.color || "#7c8aa5"
+        };
+    }
+
+    function selectedSubjectEntries() {
+        const yearId = currentSelectedYear();
+        return currentSelectedSubjects().map(subjectId => subjectEntryForYear(yearId, subjectId)).filter(Boolean);
+    }
+
+    function liveSelectedSubjectEntries() {
+        return selectedSubjectEntries().filter(entry => entry.status === "live" && entry.data);
+    }
+
+    function liveSelectedSubjectIds() {
+        return liveSelectedSubjectEntries().map(entry => entry.id);
+    }
+
+    function isSelectedLiveSubject(subjectId) {
+        return liveSelectedSubjectIds().includes(subjectId);
+    }
+
+    function correctCountForSubject(subjectId) {
+        const subjState = state.subjects[subjectId] || { attempts: {} };
+        return Object.values(subjState.attempts || {}).filter(a => a.correct).length;
+    }
+
+    function selectedStudySummary() {
+        return liveSelectedSubjectIds().reduce((summary, subjectId) => {
+            const subjSummary = subjectSummary(subjectId);
+            summary.totalQuestions += subjSummary.total;
+            summary.attempted += subjSummary.attempted;
+            summary.correct += correctCountForSubject(subjectId);
+            return summary;
+        }, { totalQuestions: 0, attempted: 0, correct: 0 });
+    }
+
+    function saveStudyProfile(yearId, selectedSubjects) {
+        state.settings.selectedYear = normalizeYearId(yearId);
+        state.settings.selectedSubjects = normalizeSelectedSubjects(state.settings.selectedYear, selectedSubjects);
+        saveState();
+        applyCustomName();
+        applyFooterCaption();
     }
 
     /* ---------- Router ---------- */
@@ -260,6 +749,7 @@
         window.scrollTo(0, 0);
 
         updateClanBadge();
+        if (!hasStudyProfile() && route[0] !== "settings") return renderProfileSetup(root);
         if (route.length === 0) return renderHome(root);
         if (route[0] === "progress") return renderProgress(root);
         if (route[0] === "settings") return renderSettings(root);
@@ -270,13 +760,14 @@
             return renderBreakHub(root);
         }
         if (route[0] === "clan") {
-            if (route[1] === "claim") return renderClaim(root);
+            if (route[1] === "claim") return renderCollectionClaim(root);
+            if (route[1] === "combine") return renderCollectionCombine(root);
             if (route[1] === "park") {
-                if (route[2] === "play") return renderParkPlay(root);
-                return renderParkSelect(root);
+                if (route[2] === "play") return renderCollectionParkPlay(root);
+                return renderCollectionParkSelect(root);
             }
-            if (route[1] === "cat" && route[2]) return renderCatDetail(root, route[2]);
-            return renderClan(root);
+            if ((route[1] === "cat" || route[1] === "pet") && route[2]) return renderCollectionDetail(root, route[2], route[1]);
+            return renderCollectionHub(root);
         }
         if (route[0] === "subject" && route[1]) {
             const subjectId = route[1];
@@ -289,7 +780,7 @@
     function updateClanBadge() {
         const badge = document.getElementById("clan-badge");
         if (!badge) return;
-        const tickets = (state.clan && state.clan.claimTickets) || 0;
+        const tickets = totalPendingTickets();
         if (tickets > 0) {
             badge.textContent = tickets;
             badge.hidden = false;
@@ -300,52 +791,279 @@
 
     /* ---------- Home view ---------- */
 
-    function renderHome(root) {
-        const name = customName();
-        const greetings = [
-            `Hi ${name}! What shall we study?`,
-            `Hi ${name}! Pick a subject — your study cats are ready 🐱`,
-            `Welcome back, ${name}. One question at a time.`,
-            `Hi ${name}! You've got this.`
-        ];
-        const greeting = greetings[Math.floor(Math.random() * greetings.length)];
-
-        const cards = SUBJECTS.map(id => {
-            const subj = window.SUBJECT_DATA[id];
-            if (!subj) return "";
-            const stats = subjectSummary(id);
+    function renderProfileSelectionFields(draft, prefix, startStep) {
+        const firstStep = startStep || 1;
+        const subjects = subjectOptionsForYear(draft.yearId);
+        const yearCards = YEAR_LEVELS.map(year => `
+            <label class="year-choice ${draft.yearId === year.id ? "is-selected" : ""}">
+                <input type="radio" name="${prefix}-year" value="${year.id}" ${draft.yearId === year.id ? "checked" : ""}>
+                <span class="year-choice-label">${escapeHtml(year.label)}</span>
+                <span class="year-choice-blurb">${escapeHtml(year.blurb || "")}</span>
+            </label>
+        `).join("");
+        const subjectCards = subjects.map(subject => {
+            const entry = subjectEntryForYear(draft.yearId, subject.id);
+            const checked = draft.selectedSubjects.includes(subject.id);
             return `
-                <a class="subject-card" href="#/subject/${id}" style="--accent:${subj.color}">
-                    <div class="subject-card-icon" aria-hidden="true">${subj.icon}</div>
-                    <h3>${escapeHtml(subj.name)}</h3>
-                    <p class="subject-tagline">${escapeHtml(subj.tagline)}</p>
-                    <div class="subject-card-stats">
-                        <span>${stats.attempted}/${stats.total} answered</span>
-                        <span>${stats.correct}% correct</span>
-                    </div>
-                    <div class="progress-bar"><span style="width:${stats.attemptedPct}%"></span></div>
-                </a>
+                <label class="profile-subject-choice ${checked ? "is-selected" : ""} ${entry.status === "coming-soon" ? "is-coming-soon" : ""}">
+                    <input type="checkbox" data-profile-prefix="${prefix}" data-role="subject" value="${subject.id}" ${checked ? "checked" : ""}>
+                    <span class="profile-subject-icon" aria-hidden="true">${entry.icon}</span>
+                    <span class="profile-subject-copy">
+                        <strong>${escapeHtml(entry.name)}</strong>
+                        <span>${escapeHtml(entry.tagline || (entry.status === "coming-soon" ? "Coming soon." : ""))}</span>
+                    </span>
+                    <span class="profile-subject-status">${entry.status === "coming-soon" ? "Coming soon" : "Ready now"}</span>
+                </label>
             `;
         }).join("");
+        return `
+            <div class="profile-form-block">
+                <div class="profile-section-heading">
+                    <h2>${firstStep}. Pick your year</h2>
+                </div>
+                <div class="year-choice-grid">${yearCards}</div>
+            </div>
+            <div class="profile-form-block">
+                <div class="profile-section-heading">
+                    <h2>${firstStep + 1}. Pick your subjects</h2>
+                    <p data-profile-count="${prefix}">${draft.selectedSubjects.length} subject${draft.selectedSubjects.length === 1 ? "" : "s"} selected</p>
+                </div>
+                <div class="profile-subject-grid">${subjectCards}</div>
+            </div>
+        `;
+    }
 
-        const totalAnswered = state.stats.totalAnswered;
-        const totalCorrect = state.stats.totalCorrect;
-        const overallPct = pct(totalCorrect, totalAnswered);
-        const totalQuestions = SUBJECTS.reduce((acc, id) => acc + countAllQuestions(id), 0);
+    function renderOnboardingThemeFields(themeId) {
+        const selectedTheme = normalizeThemePreference(themeId);
+        return `
+            <div class="profile-form-block">
+                <div class="profile-section-heading">
+                    <h2>2. Pick your theme</h2>
+                    <p>You can still change this later in Settings.</p>
+                </div>
+                <div class="theme-switcher onboarding-theme-switcher" role="radiogroup" aria-label="Choose theme">
+                    <button type="button" class="theme-switch-btn ${selectedTheme === "cats" ? "is-active" : ""}" data-profile-theme="cats" aria-pressed="${selectedTheme === "cats" ? "true" : "false"}">
+                        <span class="theme-switch-emoji">🐱</span>
+                        <span class="theme-switch-copy">
+                            <strong>Cats</strong>
+                            <span>Study cats, Cat Clan, and cat-themed mascots</span>
+                        </span>
+                    </button>
+                    <button type="button" class="theme-switch-btn ${selectedTheme === "animals" ? "is-active" : ""}" data-profile-theme="animals" aria-pressed="${selectedTheme === "animals" ? "true" : "false"}">
+                        <span class="theme-switch-emoji">🦊</span>
+                        <span class="theme-switch-copy">
+                            <strong>Pets</strong>
+                            <span>Cute animal mascots and collectible pets</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function bindProfileSelectionForm(root, draft, prefix, onYearChange, onSave, opts) {
+        opts = opts || {};
+        const yearSelector = `input[name="${prefix}-year"]`;
+        const subjectSelector = `input[data-profile-prefix="${prefix}"][data-role="subject"]`;
+        const saveBtn = document.getElementById(`${prefix}-save`);
+        const countEl = root.querySelector(`[data-profile-count="${prefix}"]`);
+        const nameInput = opts.nameSelector ? root.querySelector(opts.nameSelector) : null;
+        const themeButtons = opts.themeSelector ? $$(opts.themeSelector, root) : [];
+
+        function selectedSubjectsFromDom() {
+            return $$(subjectSelector, root).filter(input => input.checked).map(input => input.value);
+        }
+
+        function normalizedNameFromDom() {
+            return nameInput ? (nameInput.value || "").trim().slice(0, 24) : "";
+        }
+
+        function normalizedThemeFromDom() {
+            const activeButton = themeButtons.find(btn => btn.classList.contains("is-active")) || themeButtons[0];
+            return normalizeThemePreference(activeButton ? activeButton.dataset.profileTheme : draft.themePreference);
+        }
+
+        function syncSelectionState() {
+            const selected = selectedSubjectsFromDom();
+            $$(".profile-subject-choice", root).forEach(label => {
+                const input = label.querySelector(subjectSelector);
+                label.classList.toggle("is-selected", !!(input && input.checked));
+            });
+            if (countEl) {
+                countEl.textContent = selected.length
+                    ? `${selected.length} subject${selected.length === 1 ? "" : "s"} selected`
+                    : "Pick at least one subject";
+            }
+            if (saveBtn) {
+                const needsName = !!opts.requireName;
+                const hasName = !needsName || !!normalizedNameFromDom();
+                saveBtn.disabled = !selected.length || !hasName;
+            }
+        }
+
+        $$(yearSelector, root).forEach(input => {
+            input.addEventListener("change", (e) => {
+                onYearChange({
+                    yearId: e.target.value,
+                    selectedSubjects: defaultSelectedSubjectsForYear(e.target.value),
+                    customName: normalizedNameFromDom(),
+                    themePreference: normalizedThemeFromDom()
+                });
+            });
+        });
+
+        $$(subjectSelector, root).forEach(input => {
+            input.addEventListener("change", syncSelectionState);
+        });
+
+        if (nameInput) {
+            nameInput.addEventListener("input", syncSelectionState);
+        }
+
+        if (themeButtons.length) {
+            themeButtons.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    onYearChange({
+                        yearId: draft.yearId,
+                        selectedSubjects: selectedSubjectsFromDom(),
+                        customName: normalizedNameFromDom(),
+                        themePreference: btn.dataset.profileTheme
+                    });
+                });
+            });
+        }
+
+        if (saveBtn) {
+            saveBtn.addEventListener("click", () => {
+                const selected = selectedSubjectsFromDom();
+                if (!selected.length) return;
+                onSave(draft.yearId, selected, {
+                    customName: normalizedNameFromDom(),
+                    themePreference: normalizedThemeFromDom()
+                });
+            });
+        }
+
+        syncSelectionState();
+    }
+
+    function renderProfileSetup(root, draft) {
+        const resolved = resolveProfileDraft(draft);
+        const setupTheme = normalizeThemePreference(resolved.themePreference);
+        const themeLabel = setupTheme === "animals" ? "pets" : "cats";
+        root.innerHTML = `
+            <section class="profile-setup">
+                <div class="profile-setup-copy">
+                    <div class="hero-cat">${mascotSvgForTheme(setupTheme, "wave")}</div>
+                    <h1>Let's set up your study guide.</h1>
+                    <p>Choose your year and the subjects you want on your home screen. You can change them later in Settings, and hidden subjects keep their saved progress. Your study ${themeLabel} will be waiting.</p>
+                </div>
+                <div class="profile-setup-panel">
+                    <div class="profile-form-block">
+                        <div class="profile-section-heading">
+                            <h2>1. Add your name</h2>
+                            <p>We'll use it in greetings and the brand bar.</p>
+                        </div>
+                        <label class="settings-field onboarding-name-field">
+                            <span>Your name</span>
+                            <input type="text" id="onboarding-name" value="${escapeHtml(resolved.customName || "")}" maxlength="24" placeholder="Enter your name" autocomplete="name">
+                        </label>
+                    </div>
+                    ${renderOnboardingThemeFields(setupTheme)}
+                    ${renderProfileSelectionFields(resolved, "onboarding", 3)}
+                    <div class="profile-setup-actions">
+                        <button type="button" class="primary-btn" id="onboarding-save">Start studying</button>
+                    </div>
+                </div>
+            </section>
+        `;
+        bindProfileSelectionForm(
+            root,
+            resolved,
+            "onboarding",
+            nextDraft => renderProfileSetup(root, nextDraft),
+            (yearId, selectedSubjects, extra) => {
+                state.settings.customName = (extra && extra.customName) || "";
+                state.settings.themePreference = normalizeThemePreference(extra && extra.themePreference);
+                saveStudyProfile(yearId, selectedSubjects);
+                applyCustomName();
+                location.hash = "#/";
+                render();
+                mascotPopIn({
+                    expression: "cheering",
+                    message: currentThemeId() === "animals" ? "Pawsome! Your pet-friendly study space is ready." : "Pawsome! Your study space is ready.",
+                    duration: 2600
+                });
+            },
+            { nameSelector: "#onboarding-name", themeSelector: "[data-profile-theme]" }
+        );
+    }
+
+    function renderHome(root) {
+        if (!hasStudyProfile()) return renderProfileSetup(root);
+        const name = customName();
+        const year = yearLabel(currentSelectedYear());
+        const greetings = currentThemeId() === "animals"
+            ? [
+                `Hi ${name}! What shall we study for ${year}?`,
+                `Hi ${name}! Pick a ${year} subject - your study pets are ready.`,
+                `Welcome back, ${name}. ${year} study time starts here.`,
+                `Hi ${name}! Your pet crew says you've got this.`
+            ]
+            : [
+                `Hi ${name}! What shall we study for ${year}?`,
+                `Hi ${name}! Pick a ${year} subject - your study cats are ready.`,
+                `Welcome back, ${name}. ${year} study time starts here.`,
+                `Hi ${name}! You've got this, ${year} star.`
+            ];
+        const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+        const selectedEntries = selectedSubjectEntries();
+        const liveEntries = selectedEntries.filter(entry => entry.status === "live");
+        const hasLiveSubjects = !!liveEntries.length;
+        const summary = selectedStudySummary();
+        const overallPct = pct(summary.correct, summary.attempted);
+        const cards = selectedEntries.map(entry => {
+            if (entry.status === "live" && entry.data) {
+                const stats = subjectSummary(entry.id);
+                return `
+                    <a class="subject-card" href="#/subject/${entry.id}" style="--accent:${entry.color}">
+                        <div class="subject-card-icon" aria-hidden="true">${entry.icon}</div>
+                        <h3>${escapeHtml(entry.name)}</h3>
+                        <p class="subject-tagline">${escapeHtml(entry.tagline)}</p>
+                        <div class="subject-card-stats">
+                            <span>${stats.attempted}/${stats.total} answered</span>
+                            <span>${stats.correct}% correct</span>
+                        </div>
+                        <div class="progress-bar"><span style="width:${stats.attemptedPct}%"></span></div>
+                    </a>
+                `;
+            }
+            return `
+                <article class="subject-card subject-card-disabled" style="--accent:${entry.color}">
+                    <div class="subject-card-badge">Coming soon</div>
+                    <div class="subject-card-icon" aria-hidden="true">${entry.icon}</div>
+                    <h3>${escapeHtml(entry.name)}</h3>
+                    <p class="subject-tagline">${escapeHtml(entry.tagline)}</p>
+                    <p class="subject-coming-soon">Selected for ${escapeHtml(entry.yearLabel)}, but this study pack is still on its way.</p>
+                </article>
+            `;
+        }).join("");
 
         root.innerHTML = `
             <section class="hero">
                 <div class="hero-text">
                     <h1>${escapeHtml(greeting)}</h1>
-                    <p>Half-Yearly exams are coming up. Pick a subject below to start practising — your progress saves automatically.</p>
+                    <p>${hasLiveSubjects
+                        ? `${escapeHtml(year)} study packs are ready below. Pick a subject to start practising — your progress saves automatically.`
+                        : `${escapeHtml(year)} subjects are saved. Right now your selected study pack is still coming soon, but you can change your choices in Settings any time.`}</p>
                     <div class="hero-stats">
-                        <div><strong>${totalAnswered}</strong><span>answered</span></div>
-                        <div><strong>${overallPct}%</strong><span>correct overall</span></div>
-                        <div><strong>${state.stats.bestStreak}</strong><span>best streak 🔥</span></div>
-                        <div><strong>${totalQuestions}</strong><span>questions total</span></div>
+                        <div><strong>${selectedEntries.length}</strong><span>subjects chosen</span></div>
+                        <div><strong>${summary.attempted}</strong><span>answered</span></div>
+                        <div><strong>${hasLiveSubjects ? `${overallPct}%` : "Soon"}</strong><span>${hasLiveSubjects ? "correct overall" : "study packs"}</span></div>
+                        <div><strong>${hasLiveSubjects ? summary.totalQuestions : year}</strong><span>${hasLiveSubjects ? "questions total" : "current year"}</span></div>
                     </div>
                 </div>
-                <div class="hero-cat">${window.Cats.svg("wave", "ginger")}</div>
+                <div class="hero-cat">${mascotSvg("wave")}</div>
             </section>
             <section class="subject-grid">${cards}</section>
         `;
@@ -354,10 +1072,11 @@
     /* ---------- Subject view ---------- */
 
     function renderSubject(root, subjectId) {
+        if (!isSelectedLiveSubject(subjectId)) { navigate("/"); return; }
         const subj = window.SUBJECT_DATA[subjectId];
         if (!subj) { navigate("/"); return; }
         const stats = subjectSummary(subjectId);
-        const isMaths = subjectId === "maths";
+        const isMaths = isMathsSubject(subjectId);
 
         root.innerHTML = `
             <a class="back-link" href="#/">← All subjects</a>
@@ -489,7 +1208,7 @@
         return `
             <section class="exams-section">
                 <h2>🎯 Practice Questions <span class="section-tag">${subj.practiceExams.length} sets · 20 questions each</span></h2>
-                <p class="section-blurb">Each set is a focused, topic-themed bundle of 20 questions. Answers lock once placed, and you can re-attempt as many times as you like. Help is available on every question. Score 100% to unlock a new cat for your clan!</p>
+                <p class="section-blurb">Each set is a focused, topic-themed bundle of 20 questions. Answers lock once placed, and you can re-attempt as many times as you like. Help is available on every question. Score 100% to unlock a new pet for your active theme!</p>
                 ${body}
             </section>
         `;
@@ -553,6 +1272,7 @@
     }
 
     function renderQuiz(root, subjectId, mode) {
+        if (!isSelectedLiveSubject(subjectId)) { navigate("/"); return; }
         const subj = window.SUBJECT_DATA[subjectId];
         if (!subj) { navigate("/"); return; }
         const questions = buildQuestionList(subj, mode);
@@ -611,6 +1331,14 @@
         };
         if (isMock) startMockTimer();
         renderCurrentQuestion(root);
+    }
+
+    function wireRetakeButton(root) {
+        const btn = document.getElementById("retake-quiz-btn");
+        if (!btn || !session) return;
+        btn.addEventListener("click", () => {
+            renderQuiz(root, session.subjectId, session.mode);
+        });
     }
 
     /* ---------- AI marking helpers ---------- */
@@ -824,6 +1552,7 @@
                 <article class="question-card ${isLocked ? "is-locked" : ""}">
                     <div class="qtype-badge">${type === "mcq" ? "Multiple choice" : type === "long" ? "Extended response" : "Short answer"}</div>
                     <div class="question-prompt">${renderText(q.q)}</div>
+                    ${renderQuestionDiagram(q.diagram)}
                     ${q.marks && !session.isMock ? `<div class="marks">[${q.marks} mark${q.marks === 1 ? "" : "s"}]</div>` : ""}
                     ${isLocked ? `<div class="locked-indicator">🔒 Answer locked — review only</div>` : ""}
                     <div class="answer-area" id="answer-area"></div>
@@ -835,7 +1564,7 @@
                     </div>
                 </article>
             </div>
-            ${session.subjectId === "maths" && !session.isMock ? `<button type="button" id="calc-fab" class="calc-fab" title="Open calculator (C)">🧮</button>` : ""}
+            ${isMathsSubject(session.subjectId) && !session.isMock ? `<button type="button" id="calc-fab" class="calc-fab" title="Open calculator (C)">🧮</button>` : ""}
         `;
 
         renderAnswerArea(q, previous, isLocked);
@@ -960,7 +1689,7 @@
                     if (!session.answers[k]) session.answers[k] = { userText: ($("#written-answer") || {}).value || "", correct: false };
                     session.answers[k].correct = !session.answers[k].correct;
                     if (session.answers[k].correct) {
-                        window.Cats.popIn({ expression: "cheering", message: pickPhrase("correct") });
+                        mascotPopIn({ expression: "cheering", message: pickPhrase("correct") });
                     }
                     persistAnswerForExam(q, session.answers[k]);
                     renderAnswerArea(q, session.answers[k], isLocked);
@@ -975,7 +1704,7 @@
     }
 
     function pickPhrase(kind) {
-        const list = window.Cats.phrases[kind] || [""];
+        const list = (activeMascotApi().phrases && activeMascotApi().phrases[kind]) || [""];
         return list[Math.floor(Math.random() * list.length)];
     }
 
@@ -1050,13 +1779,13 @@
         if (!silent && !session.isMock) {
             if (correct) {
                 session.sessionStreak++;
-                window.Cats.popIn({
+                mascotPopIn({
                     expression: "cheering",
                     message: session.sessionStreak >= 3 ? pickPhrase("streak") : pickPhrase("correct")
                 });
             } else {
                 session.sessionStreak = 0;
-                window.Cats.popIn({
+                mascotPopIn({
                     expression: "thinking",
                     message: pickPhrase("wrong")
                 });
@@ -1194,6 +1923,41 @@
         saveState();
     }
 
+    function grantPerfectThemeTicket(themeId, examId) {
+        const normalizedTheme = normalizeThemePreference(themeId);
+        const collectionState = collectionStateForTheme(normalizedTheme);
+        if (!collectionState.perfectExams[examId]) {
+            collectionState.perfectExams[examId] = true;
+            collectionState.claimTickets = (collectionState.claimTickets || 0) + 1;
+            return true;
+        }
+        return false;
+    }
+
+    function ticketBannerMarkup(themeId) {
+        const config = normalizeThemePreference(themeId) === "animals"
+            ? {
+                label: "Pet ticket earned!",
+                message: "You scored 100% - pick a new pet for your haven.",
+                cta: "Claim pet 🐾"
+            }
+            : {
+                label: "Cat ticket earned!",
+                message: "You scored 100% - pick a new cat for your clan.",
+                cta: "Claim cat 🐾"
+            };
+        return `
+            <div class="ticket-banner">
+                <div class="ticket-icon">🎟️</div>
+                <div>
+                    <strong>${config.label}</strong>
+                    <p>${config.message}</p>
+                </div>
+                <a class="primary-btn pulse-btn" href="#/clan/claim">${config.cta}</a>
+            </div>
+        `;
+    }
+
     function finishQuiz(root) {
         // Stop the timer first so it can't fire again during marking
         stopMockTimerInterval();
@@ -1249,20 +2013,16 @@
             if (ep.timer) ep.timer.lastResumeAt = null;
         }
 
-        // 🐾 Cat clan: scoring 100% on an exam grants a claim ticket (one per exam ID).
+        // Perfect scores grant a ticket for the currently active theme, tracked
+        // separately so switching themes never blocks future rewards.
         const isPerfect = total > 0 && correct === total;
         let grantedTicket = false;
         if (isPerfect) {
-            state.clan = state.clan || { cats: [], claimTickets: 0, perfectExams: {} };
-            if (!state.clan.perfectExams[session.mode]) {
-                state.clan.perfectExams[session.mode] = true;
-                state.clan.claimTickets = (state.clan.claimTickets || 0) + 1;
-                grantedTicket = true;
-            }
+            grantedTicket = grantPerfectThemeTicket(currentThemeId(), session.mode);
         }
         saveState();
 
-        const cat = window.Cats.celebrate(ratio);
+        const mascot = mascotCelebrate(ratio);
         const examName = session.exam ? session.exam.name : "Quiz";
         const isMock = !!session.isMock;
         const grade = gradeFor(ratio);
@@ -1276,7 +2036,7 @@
             <section class="results-hero ${isMock ? "is-mock" : ""} grade-${grade.letter.toLowerCase()}">
                 ${ratio >= 0.9 ? renderConfetti() : ""}
                 <div class="results-cat-wrap">
-                    <div class="results-cat">${window.Cats.svg(cat.expression, cat.theme)}</div>
+                    <div class="results-cat">${mascotSvg(mascot.expression, mascot.theme)}</div>
                     ${isNewBest ? `<div class="new-best-badge">🏆 NEW BEST!</div>` : ""}
                 </div>
                 <div class="results-headline">
@@ -1315,22 +2075,13 @@
                     </div>
                 </div>
 
-                ${grantedTicket ? `
-                    <div class="ticket-banner">
-                        <div class="ticket-icon">🎟️</div>
-                        <div>
-                            <strong>Cat ticket earned!</strong>
-                            <p>You scored 100% — pick a new cat for your clan.</p>
-                        </div>
-                        <a class="primary-btn pulse-btn" href="#/clan/claim">Claim cat 🐾</a>
-                    </div>
-                ` : ""}
+                ${grantedTicket ? ticketBannerMarkup(currentThemeId()) : ""}
 
                 <div class="results-actions">
-                    <a class="primary-btn pulse-btn" href="#/subject/${session.subjectId}/quiz/${session.mode}">🔁 Retake ${isMock ? "Mock" : "Practice"}</a>
+                    <button type="button" class="primary-btn pulse-btn" id="retake-quiz-btn">🔁 Retake ${isMock ? "Mock" : "Practice"}</button>
                     <a class="ghost-btn" href="#/subject/${session.subjectId}">← Back to ${escapeHtml(subj.name)}</a>
                     <a class="ghost-btn" href="#/">🏠 Home</a>
-                    <a class="ghost-btn" href="#/clan">🐾 My Clan</a>
+                    <a class="ghost-btn" href="#/clan">🐾 My Pets</a>
                 </div>
 
                 <details class="results-detail">
@@ -1346,6 +2097,7 @@
                                     : `<div class="review-user muted">No response.</div>`;
                             return `<li class="${ok ? "good" : "bad"}">
                                 <div class="review-q"><span class="review-num">Q${i + 1}.</span> ${renderText(q.q)}</div>
+                                ${renderQuestionDiagram(q.diagram)}
                                 ${userBlock}
                                 ${q.options ? `<div class="review-correct">Correct: ${escapeHtml(q.options[q.answer])}</div>` : ""}
                                 ${q.explain ? `<div class="review-explain">${renderText(q.explain)}</div>` : ""}
@@ -1361,26 +2113,28 @@
         animateScoreCounter();
 
         // Pop in some celebration cats from both sides
-        setTimeout(() => window.Cats.popIn({
-            expression: cat.expression, theme: cat.theme, message: cat.message,
+        setTimeout(() => mascotPopIn({
+            expression: mascot.expression, theme: mascot.theme, message: mascot.message,
             duration: 3500, side: "left"
         }), 400);
         if (ratio >= 0.7) {
-            setTimeout(() => window.Cats.popIn({
+            setTimeout(() => mascotPopIn({
                 expression: ratio >= 0.9 ? "cheering" : "proud",
-                theme: window.Cats.pickTheme(),
+                theme: activeMascotApi().pickTheme ? activeMascotApi().pickTheme() : undefined,
                 message: isNewBest ? "New record! 🏆" : pickPhrase("finish"),
                 duration: 3200, side: "right"
             }), 1100);
         }
         if (isNewBest) {
-            setTimeout(() => window.Cats.popIn({
+            setTimeout(() => mascotPopIn({
                 expression: "cheering",
-                theme: window.Cats.pickTheme(),
+                theme: activeMascotApi().pickTheme ? activeMascotApi().pickTheme() : undefined,
                 message: "Personal best smashed!",
                 duration: 3000, side: "left"
             }), 2200);
         }
+
+        wireRetakeButton(root);
     }
 
     /* ---------- Mock Exam Report ---------- */
@@ -1403,7 +2157,7 @@
         root.innerHTML = `
             <section class="results-hero is-mock grade-c">
                 <div class="results-cat-wrap">
-                    <div class="results-cat">${window.Cats.svg("thinking", "ginger")}</div>
+                    <div class="results-cat">${mascotSvg("thinking")}</div>
                 </div>
                 <div class="results-headline">
                     <div class="mock-stamp">📝 ${escapeHtml(session.exam ? session.exam.name : "Mock Exam")}</div>
@@ -1419,7 +2173,7 @@
             try {
                 const result = await window.AI.markAnswer({
                     apiKey,
-                    question: q.q,
+                    question: questionTextForAI(q),
                     sample: q.sample || "",
                     response: (session.answers[keyOf(q)] || {}).userText || "",
                     marks: q.marks || 4,
@@ -1484,17 +2238,21 @@
         const ts = Math.floor((timeMs % 60000) / 1000);
         const durationMin = ep.timer ? Math.floor(ep.timer.durationMs / 60000) : 60;
         const autoSubmitted = ep.timer && ep.timer.autoSubmitted;
+        const grantedTicket = totalMarks > 0 && totalAchieved === totalMarks
+            ? grantPerfectThemeTicket(currentThemeId(), session.mode)
+            : false;
         saveState();
 
         // Render the report
         const grade = gradeFor(ratio);
         const reviewItems = session.questions.map((q, i) => renderReportItem(q, i, session.answers[keyOf(q)] || {})).join("");
+        const reportMascot = mascotCelebrate(ratio);
 
         root.innerHTML = `
             <section class="exam-report is-mock grade-${grade.letter.toLowerCase()}">
                 ${ratio >= 0.9 ? renderConfetti() : ""}
                 <div class="results-cat-wrap">
-                    <div class="results-cat">${window.Cats.svg(window.Cats.celebrate(ratio).expression, window.Cats.pickTheme())}</div>
+                    <div class="results-cat">${mascotSvg(reportMascot.expression, reportMascot.theme)}</div>
                     ${isNewBest ? `<div class="new-best-badge">🏆 NEW BEST!</div>` : ""}
                 </div>
                 <div class="results-headline">
@@ -1520,10 +2278,13 @@
                 </div>
 
                 <div class="results-actions">
-                    <a class="primary-btn pulse-btn" href="#/subject/${session.subjectId}/quiz/${session.mode}">🔁 Retake</a>
+                    <button type="button" class="primary-btn pulse-btn" id="retake-quiz-btn">🔁 Retake</button>
                     <a class="ghost-btn" href="#/subject/${session.subjectId}">← Back to ${escapeHtml(subj.name)}</a>
                     <a class="ghost-btn" href="#/">🏠 Home</a>
+                    <a class="ghost-btn" href="#/clan">🐾 My Pets</a>
                 </div>
+
+                ${grantedTicket ? ticketBannerMarkup(currentThemeId()) : ""}
 
                 <details class="results-detail" open>
                     <summary>📋 Detailed report</summary>
@@ -1545,6 +2306,8 @@
                 renderExamReport(root);
             });
         });
+
+        wireRetakeButton(root);
     }
 
     function renderReportItem(q, i, a) {
@@ -1556,6 +2319,7 @@
             const userTxt = userIdx != null && q.options[userIdx] ? escapeHtml(q.options[userIdx]) : "<em>No answer</em>";
             return `<li class="${correct ? "good" : "bad"}">
                 <div class="review-q"><span class="review-num">Q${i + 1}.</span> ${renderText(q.q)}</div>
+                ${renderQuestionDiagram(q.diagram)}
                 <div class="review-user">Your answer: ${userTxt}</div>
                 <div class="review-correct">Correct: ${escapeHtml(q.options[q.answer])}</div>
                 ${q.explain ? `<div class="review-explain">${renderText(q.explain)}</div>` : ""}
@@ -1567,6 +2331,7 @@
         const aiBlock = ai ? renderAIFeedback(ai, max) : `<div class="ai-feedback-card ai-partial"><strong>No AI feedback</strong> — add a Gemini key in Settings to enable AI marking.</div>`;
         return `<li class="${correct ? "good" : "bad"}">
             <div class="review-q"><span class="review-num">Q${i + 1}.</span> ${renderText(q.q)} <span class="review-marks">[${max} marks]</span></div>
+            ${renderQuestionDiagram(q.diagram)}
             <div class="review-user">Your response: <em>${escapeHtml((a.userText || "").slice(0, 600))}${(a.userText || "").length > 600 ? "…" : ""}</em></div>
             ${aiBlock}
             <div class="report-override">
@@ -1585,14 +2350,14 @@
     }
 
     function ceremonyTitleFor(ratio, isMock, isNewBest) {
-        if (isNewBest && ratio >= 0.9) return "🏆 PURR-FECTION!";
+        if (isNewBest && ratio >= 0.9) return currentThemeId() === "animals" ? "🏆 Wild perfection!" : "🏆 PURR-FECTION!";
         if (isNewBest) return "🏆 New personal best!";
-        if (ratio >= 0.95) return "Pawsome — virtually flawless!";
-        if (ratio >= 0.85) return "Meow-velous work!";
-        if (ratio >= 0.7) return "Cat-tastic effort!";
+        if (ratio >= 0.95) return currentThemeId() === "animals" ? "Pawsome - virtually flawless!" : "Pawsome - virtually flawless!";
+        if (ratio >= 0.85) return currentThemeId() === "animals" ? "Wildly good work!" : "Meow-velous work!";
+        if (ratio >= 0.7) return currentThemeId() === "animals" ? "Pet-tastic effort!" : "Cat-tastic effort!";
         if (ratio >= 0.5) return "You're getting there!";
-        if (ratio > 0) return "Don't fur-get — every retry is progress.";
-        return "Take a cat-nap, then go again.";
+        if (ratio > 0) return currentThemeId() === "animals" ? "Don't worry - every retry is progress." : "Don't fur-get - every retry is progress.";
+        return currentThemeId() === "animals" ? "Take a breather, then go again." : "Take a cat-nap, then go again.";
     }
 
     function ceremonySubFor(ratio, isMock, isNewBest, previousAttempts, previousBest) {
@@ -1657,7 +2422,16 @@
     /* ---------- Progress view ---------- */
 
     function renderProgress(root) {
-        const rows = SUBJECTS.map(id => {
+        const liveIds = liveSelectedSubjectIds();
+        if (!liveIds.length) {
+            root.innerHTML = `
+                <a class="back-link" href="#/">← Home</a>
+                <h1>My progress</h1>
+                <p>No progress to show yet for ${escapeHtml(yearLabel(currentSelectedYear()) || "your year")} — your selected subjects are still coming soon.</p>
+            `;
+            return;
+        }
+        const rows = liveIds.map(id => {
             const subj = window.SUBJECT_DATA[id];
             if (!subj) return "";
             const stats = subjectSummary(id);
@@ -1685,11 +2459,12 @@
                 </article>
             `;
         }).join("");
+        const summary = selectedStudySummary();
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
             <h1>My progress</h1>
-            <p>${state.stats.totalAnswered} questions answered · ${pct(state.stats.totalCorrect, state.stats.totalAnswered)}% correct overall · best streak ${state.stats.bestStreak} 🔥</p>
+            <p>${summary.attempted} questions answered · ${pct(summary.correct, summary.attempted)}% correct overall · best streak ${state.stats.bestStreak} 🔥</p>
             <div class="progress-grid">${rows}</div>
         `;
     }
@@ -1703,15 +2478,370 @@
         return state.clan;
     }
 
+    function renderCollectionThemeSwitch(activeId) {
+        const catState = clanState();
+        const animalProgress = animalsState();
+        const items = [
+            {
+                id: "cats",
+                emoji: "🐱",
+                label: "Cats",
+                count: totalCatCompanions(),
+                tickets: catState.claimTickets || 0
+            },
+            {
+                id: "animals",
+                emoji: "🦊",
+                label: "Animals",
+                count: totalAnimalCompanions(),
+                tickets: animalProgress.claimTickets || 0
+            }
+        ];
+        return `
+            <div class="theme-switcher" role="tablist" aria-label="Choose collection theme">
+                ${items.map(item => `
+                    <button
+                        type="button"
+                        class="theme-switch-btn ${item.id === activeId ? "is-active" : ""}"
+                        data-theme-switch="${item.id}"
+                        role="tab"
+                        aria-selected="${item.id === activeId ? "true" : "false"}">
+                        <span class="theme-switch-emoji">${item.emoji}</span>
+                        <span class="theme-switch-copy">
+                            <strong>${item.label}</strong>
+                            <span>${item.count} collected · ${item.tickets} ticket${item.tickets === 1 ? "" : "s"}</span>
+                        </span>
+                    </button>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    function wireCollectionThemeSwitch(root, path) {
+        $$("[data-theme-switch]", root).forEach(btn => {
+            btn.addEventListener("click", () => {
+                setThemePreference(btn.dataset.themeSwitch);
+                navigate(path || "/clan");
+            });
+        });
+    }
+
+    function renderCollectionHub(root) {
+        return currentThemeId() === "animals" ? renderAnimalCollection(root) : renderClan(root);
+    }
+
+    function renderCollectionClaim(root) {
+        return currentThemeId() === "animals" ? renderAnimalClaim(root) : renderClaim(root);
+    }
+
+    function renderCollectionParkSelect(root) {
+        return currentThemeId() === "animals" ? renderAnimalParkSelect(root) : renderParkSelect(root);
+    }
+
+    function renderCollectionParkPlay(root) {
+        return currentThemeId() === "animals" ? renderAnimalParkPlay(root) : renderParkPlay(root);
+    }
+
+    function renderCollectionCombine(root) {
+        return currentThemeId() === "animals" ? renderAnimalCombine(root) : renderCatCombine(root);
+    }
+
+    function renderCollectionDetail(root, itemId, routeKind) {
+        if (routeKind === "cat") return renderCatDetail(root, itemId);
+        if (routeKind === "pet") return renderAnimalDetail(root, itemId);
+        return currentThemeId() === "animals" ? renderAnimalDetail(root, itemId) : renderCatDetail(root, itemId);
+    }
+
+    function renderCatCombine(root) {
+        const cs = clanState();
+        const originals = (cs.cats || []).map(cat => ({ entry: cat, id: cat.breedId, spec: window.Clan.findBreed(cat.breedId) })).filter(item => item.spec);
+        const switcher = renderCollectionThemeSwitch("cats");
+        if (originals.length < 2) {
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Clan</a>
+                ${switcher}
+                <section class="empty">
+                    <p>You need at least <strong>two original cats</strong> before you can make a hybrid.</p>
+                </section>
+            `;
+            wireCollectionThemeSwitch(root, "/clan/combine");
+            return;
+        }
+
+        let selectedIds = [];
+
+        function draw() {
+            const selected = new Set(selectedIds);
+            const first = selectedIds[0] || "";
+            const second = selectedIds[1] || "";
+            const hybridSpec = first && second ? window.Hybrids.buildCatSpec(first, second) : null;
+            const hybridId = hybridSpec ? window.Hybrids.catId(first, second) : "";
+            const existing = hybridId ? findCatHybridEntry(hybridId) : null;
+            const chooserCards = originals.map(item => `
+                <button type="button" class="park-pick ${selected.has(item.id) ? "is-picked" : ""}" data-combine-id="${item.id}">
+                    <div class="park-pick-svg">${renderCatArt(item.id, "wave")}</div>
+                    <div class="park-pick-name">${escapeHtml(item.entry.name)}</div>
+                    <div class="park-pick-breed">${escapeHtml(item.spec.breed)}</div>
+                    ${selected.has(item.id) ? `<div class="park-pick-check">✓</div>` : ""}
+                </button>
+            `).join("");
+
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Clan</a>
+                ${switcher}
+                <header class="claim-header">
+                    <h1>🧬 Combine two cats</h1>
+                    <p>Pick two original cats to stitch together into one gloriously silly hybrid. Existing hybrids stay in your collection, but only originals can be parents.</p>
+                </header>
+                <section class="combine-preview">
+                    ${hybridSpec ? `
+                        <div class="combine-preview-stage">${window.Hybrids.renderCatHybrid(hybridSpec, "happy")}</div>
+                        <div class="combine-preview-copy">
+                            <p class="combine-kicker">${escapeHtml(selectedIds.length === 2 ? "Previewing your hybrid cat" : "Choose two cats")}</p>
+                            <h2>${escapeHtml(hybridSpec.defaultName)}</h2>
+                            <p class="cat-archetype">${escapeHtml(hybridSpec.breed)} ${renderRarityBadge(hybridSpec.rarity)} <span class="hybrid-label">Hybrid</span></p>
+                            <p class="combine-summary">${escapeHtml(hybridSpec.backstory)}</p>
+                            <div class="claim-traits">
+                                ${hybridSpec.traits.map(trait => `<span class="trait-chip">${escapeHtml(trait)}</span>`).join("")}
+                            </div>
+                            <div class="combine-actions">
+                                <button type="button" class="primary-btn pulse-btn" id="combine-create-btn">${existing ? "Visit existing hybrid" : "Create hybrid cat"}</button>
+                                <button type="button" class="ghost-btn" id="combine-clear-btn">Clear picks</button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="combine-empty">
+                            <div class="combine-preview-stage">${window.Cats.svg("thinking", "cream")}</div>
+                            <div class="combine-preview-copy">
+                                <p class="combine-kicker">Pick two originals</p>
+                                <h2>Funny new cat incoming</h2>
+                                <p class="combine-summary">Choose any two different cats from your clan to preview the stitched-together result.</p>
+                            </div>
+                        </div>
+                    `}
+                </section>
+                <section class="park-pick-grid">${chooserCards}</section>
+            `;
+
+            $$("[data-combine-id]", root).forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const id = btn.dataset.combineId;
+                    if (selected.has(id)) {
+                        selectedIds = selectedIds.filter(value => value !== id);
+                    } else if (selectedIds.length < 2) {
+                        selectedIds.push(id);
+                    } else {
+                        selectedIds = [selectedIds[1], id];
+                    }
+                    draw();
+                });
+            });
+
+            const createBtn = $("#combine-create-btn");
+            if (createBtn && hybridSpec) {
+                createBtn.addEventListener("click", () => {
+                    const result = ensureCatHybrid(first, second);
+                    if (!result) return;
+                    const spec = catSpecFor(result.entry.hybridId);
+                    window.Cats.popIn({
+                        expression: result.created ? "cheering" : "love",
+                        theme: window.Cats.pickTheme(),
+                        message: result.created ? `Hybrid unlocked: ${spec.defaultName}!` : `${result.entry.name} is already in your clan!`,
+                        duration: 3200,
+                        side: "left"
+                    });
+                    navigate(`/clan/cat/${result.entry.hybridId}`);
+                });
+            }
+            const clearBtn = $("#combine-clear-btn");
+            if (clearBtn) {
+                clearBtn.addEventListener("click", () => {
+                    selectedIds = [];
+                    draw();
+                });
+            }
+            wireCollectionThemeSwitch(root, "/clan/combine");
+        }
+
+        draw();
+    }
+
+    function renderAnimalCombine(root) {
+        const progress = animalsState();
+        const originals = (progress.pets || []).map(pet => ({ entry: pet, id: pet.petId, spec: window.Animals.findPet(pet.petId) })).filter(item => item.spec);
+        const switcher = renderCollectionThemeSwitch("animals");
+        let usePotion = false;
+        let selectedIds = [];
+        const canMakeAnything = originals.length >= 2 || (originals.length >= 1 && sparklePotionCount() > 0);
+        if (!canMakeAnything) {
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Pets</a>
+                ${switcher}
+                <section class="empty">
+                    <p>You need <strong>two original pets</strong>, or <strong>one original pet plus a Sparkle Potion</strong>, before you can make a special result.</p>
+                </section>
+            `;
+            wireCollectionThemeSwitch(root, "/clan/combine");
+            return;
+        }
+
+        function draw() {
+            const potionBalance = sparklePotionCount();
+            const selected = new Set(selectedIds);
+            const first = selectedIds[0] || "";
+            const second = selectedIds[1] || "";
+            const hybridSpec = first && second ? window.Hybrids.buildAnimalSpec(first, second, { sparkle: usePotion }) : null;
+            const hybridId = hybridSpec ? window.Hybrids.animalId(first, second, { sparkle: usePotion }) : "";
+            const existing = hybridId ? findAnimalHybridEntry(hybridId) : null;
+            const canDoubleSelectedPet = usePotion && potionBalance > 0 && !!first && selectedIds.length === 1;
+            const chooserCards = originals.map(item => `
+                <button type="button" class="park-pick ${selected.has(item.id) ? "is-picked" : ""}" data-combine-id="${item.id}">
+                    <div class="park-pick-svg">${renderAnimalArt(item.id, "wave")}</div>
+                    <div class="park-pick-name">${escapeHtml(item.entry.name)}</div>
+                    <div class="park-pick-breed">${escapeHtml(item.spec.species)}</div>
+                    ${selected.has(item.id) ? `<div class="park-pick-check">✓</div>` : ""}
+                </button>
+            `).join("");
+
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Pets</a>
+                ${switcher}
+                <header class="claim-header">
+                    <h1>🧬 Combine two pets</h1>
+                    <p>Pick two original pets to mash into one delightfully oddball companion. Add a Sparkle Potion if you want the result to glow. Potions in bag: <strong>${potionBalance}</strong>.</p>
+                </header>
+                <div class="combine-toolbar">
+                    <button type="button" class="ghost-btn ${usePotion ? "is-active" : ""}" id="toggle-sparkle-btn" ${potionBalance <= 0 ? "disabled" : ""}>
+                        ✨ ${usePotion ? "Sparkle Potion added" : "Add Sparkle Potion"}
+                    </button>
+                    <span class="combine-toolbar-copy">${usePotion ? "A potion will be consumed only if you create a new sparkle result." : "Combine without a potion for a standard stitched hybrid."}</span>
+                </div>
+                <section class="combine-preview">
+                    ${hybridSpec ? `
+                        <div class="combine-preview-stage">${window.Hybrids.renderAnimalHybrid(hybridSpec, "happy")}</div>
+                        <div class="combine-preview-copy">
+                            <p class="combine-kicker">${escapeHtml(hybridSpec.sparkle ? "Previewing your sparkle result" : "Previewing your hybrid pet")}</p>
+                            <h2>${escapeHtml(hybridSpec.defaultName)}</h2>
+                            <p class="cat-archetype">${escapeHtml(hybridSpec.species)} ${renderRarityBadge(hybridSpec.rarity)}${renderAnimalVariantBadges(hybridSpec)}</p>
+                            <p class="combine-summary">${escapeHtml(hybridSpec.backstory)}</p>
+                            <div class="claim-traits">
+                                ${hybridSpec.traits.map(trait => `<span class="trait-chip">${escapeHtml(trait)}</span>`).join("")}
+                            </div>
+                            <div class="combine-actions">
+                                <button type="button" class="primary-btn pulse-btn" id="combine-create-btn">${existing ? "Visit existing result" : (hybridSpec.sparkle ? "Create sparkle pet" : "Create hybrid pet")}</button>
+                                <button type="button" class="ghost-btn" id="combine-clear-btn">Clear picks</button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="combine-empty">
+                            <div class="combine-preview-stage">${window.Animals.svg("thinking", "meadow")}</div>
+                            <div class="combine-preview-copy">
+                                <p class="combine-kicker">${usePotion ? "Potion mode is on" : "Pick two originals"}</p>
+                                <h2>${usePotion ? "Bright new sparkle pet incoming" : "Funny new pet incoming"}</h2>
+                                <p class="combine-summary">${usePotion ? "Choose two originals, or use the same pet twice, to preview the glowing result." : "Choose any two different pets from your haven to preview the stitched-together result."}</p>
+                                ${canDoubleSelectedPet ? `<button type="button" class="ghost-btn" id="same-pet-sparkle-btn">Use ${escapeHtml(findOwnedAnimalEntry(first).name)} twice for a sparkle version</button>` : ""}
+                            </div>
+                        </div>
+                    `}
+                </section>
+                <section class="park-pick-grid">${chooserCards}</section>
+            `;
+
+            $$("[data-combine-id]", root).forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const id = btn.dataset.combineId;
+                    if (selected.has(id)) {
+                        selectedIds = selectedIds.filter(value => value !== id);
+                    } else if (selectedIds.length < 2) {
+                        selectedIds.push(id);
+                    } else {
+                        selectedIds = [selectedIds[1], id];
+                    }
+                    draw();
+                });
+            });
+
+            const toggleBtn = $("#toggle-sparkle-btn");
+            if (toggleBtn) {
+                toggleBtn.addEventListener("click", () => {
+                    if (potionBalance <= 0) {
+                        window.Animals.popIn({
+                            expression: "thinking",
+                            theme: window.Animals.pickTheme(),
+                            message: "No Sparkle Potions left - grab one from the ticket screen first.",
+                            duration: 2600,
+                            side: "right"
+                        });
+                        return;
+                    }
+                    usePotion = !usePotion;
+                    if (!usePotion && selectedIds.length === 2 && selectedIds[0] === selectedIds[1]) {
+                        selectedIds = [selectedIds[0]];
+                    }
+                    draw();
+                });
+            }
+
+            const samePetBtn = $("#same-pet-sparkle-btn");
+            if (samePetBtn && first) {
+                samePetBtn.addEventListener("click", () => {
+                    selectedIds = [first, first];
+                    draw();
+                });
+            }
+
+            const createBtn = $("#combine-create-btn");
+            if (createBtn && hybridSpec) {
+                createBtn.addEventListener("click", () => {
+                    const result = ensureAnimalHybrid(first, second, { sparkle: usePotion });
+                    if (!result) {
+                        window.Animals.popIn({
+                            expression: "thinking",
+                            theme: window.Animals.pickTheme(),
+                            message: usePotion ? "That sparkle recipe can't be made right now - check your potion stash and try again." : "That pet combo can't be made right now - try another pair.",
+                            duration: 2800,
+                            side: "right"
+                        });
+                        draw();
+                        return;
+                    }
+                    const spec = animalSpecFor(result.entry.hybridId);
+                    window.Animals.popIn({
+                        expression: result.created ? "cheering" : "love",
+                        theme: window.Animals.pickTheme(),
+                        message: result.created ? `${spec.sparkle ? "Sparkle" : "Hybrid"} unlocked: ${spec.defaultName}!` : `${result.entry.name} is already in your haven!`,
+                        duration: 3200,
+                        side: "left"
+                    });
+                    navigate(`/clan/pet/${result.entry.hybridId}`);
+                });
+            }
+            const clearBtn = $("#combine-clear-btn");
+            if (clearBtn) {
+                clearBtn.addEventListener("click", () => {
+                    selectedIds = [];
+                    draw();
+                });
+            }
+            wireCollectionThemeSwitch(root, "/clan/combine");
+        }
+
+        draw();
+    }
+
     function renderClan(root) {
         const cs = clanState();
         const total = window.Clan.totalBreeds();
-        const own = cs.cats.length;
+        const originals = (cs.cats || []).length;
+        const hybrids = catHybridEntries().length;
+        const own = originals + hybrids;
         const tickets = cs.claimTickets || 0;
+        const switcher = renderCollectionThemeSwitch("cats");
 
         if (own === 0 && tickets === 0) {
             root.innerHTML = `
                 <a class="back-link" href="#/">← Home</a>
+                ${switcher}
                 <section class="clan-empty">
                     <div class="clan-empty-cat">${window.Cats.svg("wave", "ginger")}</div>
                     <h1>Your cat clan is waiting!</h1>
@@ -1720,19 +2850,21 @@
                     <a class="primary-btn" href="#/">Start a quiz →</a>
                 </section>
             `;
+            wireCollectionThemeSwitch(root, "/clan");
             return;
         }
 
-        const catCards = cs.cats.map(cat => {
-            const breed = window.Clan.findBreed(cat.breedId);
+        const catCards = catCompanionEntries().map(cat => {
+            const id = catEntryId(cat);
+            const breed = catSpecFor(id);
             if (!breed) return "";
             const happy = window.Clan.currentHappiness(cat);
             const mood = window.Clan.moodFor(happy);
             return `
-                <a class="clan-card mood-${mood.label.toLowerCase()}" href="#/clan/cat/${cat.breedId}">
-                    <div class="clan-card-svg">${window.Cats.breedSvg(breed.appearance, mood.expression)}</div>
+                <a class="clan-card mood-${mood.label.toLowerCase()}" href="#/clan/cat/${id}">
+                    <div class="clan-card-svg">${renderCatArt(id, mood.expression)}</div>
                     <h3>${escapeHtml(cat.name)}</h3>
-                    <p class="clan-card-breed">${escapeHtml(breed.breed)}</p>
+                    <p class="clan-card-breed">${escapeHtml(breed.breed)} ${renderRarityBadge(breed.rarity)}${cat.hybridId ? ` <span class="hybrid-label">Hybrid</span>` : ""}</p>
                     <p class="clan-card-mood">${mood.label === "Lonely" ? "😿" : mood.label === "Bored" ? "😼" : mood.label === "Content" ? "😺" : mood.label === "Happy" ? "😸" : "😻"} ${mood.label}</p>
                     <div class="clan-card-bar"><span style="width:${happy}%"></span></div>
                 </a>
@@ -1752,21 +2884,28 @@
             <p class="clan-tip">Score 100% on any quiz to earn a new 🎟️ Cat Ticket.</p>
         `;
 
-        const visitParkBtn = own > 0 ? `
-            <a class="park-cta" href="#/clan/park">🌿 Visit the Park <span class="park-cta-sub">(take up to 5 cats)</span></a>
-        ` : "";
+        const ctaButtons = [];
+        if (originals > 1) {
+            ctaButtons.push(`<a class="park-cta" href="#/clan/combine">🧬 Combine two cats <span class="park-cta-sub">(make a funny hybrid)</span></a>`);
+        }
+        if (own > 0) {
+            ctaButtons.push(`<a class="park-cta" href="#/clan/park">🌿 Visit the Park <span class="park-cta-sub">(take up to 5 cats)</span></a>`);
+        }
+        const collectionCtas = ctaButtons.length ? `<div class="collection-cta-stack">${ctaButtons.join("")}</div>` : "";
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
+            ${switcher}
             <header class="clan-header">
-                <h1>🐾 Harper's Cat Clan</h1>
-                <p>${own} / ${total} cats collected</p>
-                <div class="clan-progress-bar"><span style="width:${pct(own, total)}%"></span></div>
+                <h1>🐾 ${escapeHtml(customName())}'s Cat Clan</h1>
+                <p>${originals} / ${total} original cats collected · ${hybrids} hybrid${hybrids === 1 ? "" : "s"} created</p>
+                <div class="clan-progress-bar"><span style="width:${pct(originals, total)}%"></span></div>
             </header>
             ${ticketsBlock}
-            ${visitParkBtn}
+            ${collectionCtas}
             <section class="clan-grid">${catCards}</section>
         `;
+        wireCollectionThemeSwitch(root, "/clan");
     }
 
     /* ---------- Break hub + games ---------- */
@@ -1811,7 +2950,7 @@
         if (score > (state.breaks[game.highKey] || 0)) {
             state.breaks[game.highKey] = score;
             saveState();
-            window.Cats.popIn({
+            mascotPopIn({
                 expression: "cheering",
                 message: "New high score! 🏆",
                 duration: 3000, side: "right"
@@ -1916,7 +3055,7 @@
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
             <section class="break-lockout">
-                <div class="break-lockout-cat">${window.Cats.svg("napping", "cream")}</div>
+                <div class="break-lockout-cat">${mascotSvg("napping")}</div>
                 <h1>Studying first ✏️</h1>
                 <p class="break-blurb">Breaks are limited to <strong>one every 30 minutes</strong> so they actually feel like a break.</p>
                 <div class="break-countdown">
@@ -1926,7 +3065,7 @@
                 <p class="break-meta">Last break started at <strong>${escapeHtml(lastStr)}</strong>.</p>
                 <div class="break-lockout-actions">
                     <a class="primary-btn" href="#/">Pick a quiz</a>
-                    <a class="ghost-btn" href="#/clan">🐾 Visit my clan instead</a>
+                    <a class="ghost-btn" href="#/clan">🐾 Visit my pets instead</a>
                 </div>
             </section>
         `;
@@ -1952,20 +3091,22 @@
 
     function renderParkSelect(root) {
         const cs = clanState();
-        if (!cs.cats.length) { navigate("/clan"); return; }
+        if (!catCompanionEntries().length) { navigate("/clan"); return; }
         cs.parkSelection = cs.parkSelection || [];
+        const switcher = renderCollectionThemeSwitch("cats");
 
         const selected = new Set(cs.parkSelection);
 
-        const catCards = cs.cats.map(cat => {
-            const breed = window.Clan.findBreed(cat.breedId);
+        const catCards = catCompanionEntries().map(cat => {
+            const id = catEntryId(cat);
+            const breed = catSpecFor(id);
             if (!breed) return "";
-            const isSel = selected.has(cat.breedId);
+            const isSel = selected.has(id);
             return `
-                <button type="button" class="park-pick ${isSel ? "is-picked" : ""}" data-id="${cat.breedId}">
-                    <div class="park-pick-svg">${window.Cats.breedSvg(breed.appearance, "wave")}</div>
+                <button type="button" class="park-pick ${isSel ? "is-picked" : ""}" data-id="${id}">
+                    <div class="park-pick-svg">${renderCatArt(id, "wave")}</div>
                     <div class="park-pick-name">${escapeHtml(cat.name)}</div>
-                    <div class="park-pick-breed">${escapeHtml(breed.breed)}</div>
+                    <div class="park-pick-breed">${escapeHtml(breed.breed)}${cat.hybridId ? " · Hybrid" : ""}</div>
                     ${isSel ? `<div class="park-pick-check">✓</div>` : ""}
                 </button>
             `;
@@ -1973,6 +3114,7 @@
 
         root.innerHTML = `
             <a class="back-link" href="#/clan">← Back to Clan</a>
+            ${switcher}
             <header class="park-header">
                 <h1>🌿 Visit the Park</h1>
                 <p>Pick up to <strong>5 cats</strong> to take with you.</p>
@@ -2003,6 +3145,7 @@
             if (cs.parkSelection.length === 0) return;
             navigate("/clan/park/play");
         });
+        wireCollectionThemeSwitch(root, "/clan");
     }
 
     /* ---------- Park: play view ---------- */
@@ -2011,9 +3154,7 @@
         const cs = clanState();
         const ids = cs.parkSelection || [];
         if (!ids.length) { navigate("/clan/park"); return; }
-        const selectedCats = ids
-            .map(id => cs.cats.find(c => c.breedId === id))
-            .filter(Boolean);
+        const selectedCats = ids.map(findOwnedCatEntry).filter(Boolean);
         if (!selectedCats.length) { navigate("/clan/park"); return; }
 
         // park.js takes over the root
@@ -2026,19 +3167,27 @@
                 });
                 saveState();
                 navigate("/clan");
-            }
+            },
+            renderPet: (entry, expression) => renderCatArt(catEntryId(entry), expression),
+            resolvePet: entry => catSpecFor(catEntryId(entry)),
+            getPetId: entry => catEntryId(entry),
+            getPetName: (entry, breed) => entry.name || (breed && breed.defaultName) || "Cat",
+            reactionPhrase: (petId, kind) => catReactionPhraseFor(petId, kind)
         });
     }
 
     function renderClaim(root) {
         const cs = clanState();
+        const switcher = renderCollectionThemeSwitch("cats");
         if ((cs.claimTickets || 0) <= 0) {
             root.innerHTML = `
                 <a class="back-link" href="#/clan">← Back to Clan</a>
+                ${switcher}
                 <section class="empty">
                     <p>No tickets yet! Score 100% on any quiz to earn one.</p>
                 </section>
             `;
+            wireCollectionThemeSwitch(root, "/clan");
             return;
         }
 
@@ -2048,10 +3197,12 @@
         if (!candidates.length) {
             root.innerHTML = `
                 <a class="back-link" href="#/clan">← Back to Clan</a>
+                ${switcher}
                 <section class="empty">
-                    <p>You've collected every breed! Legendary work, Harper. 🌟</p>
+                    <p>You've collected every breed! Legendary work, ${escapeHtml(customName())}. 🌟</p>
                 </section>
             `;
+            wireCollectionThemeSwitch(root, "/clan");
             return;
         }
 
@@ -2062,6 +3213,7 @@
                 <article class="claim-choice" data-breed="${b.id}">
                     <div class="claim-svg">${window.Cats.breedSvg(b.appearance, "happy")}</div>
                     <h3>${escapeHtml(b.breed)}</h3>
+                    ${renderRarityBadge(b.rarity)}
                     <p class="claim-archetype">${escapeHtml(b.archetype)}</p>
                     <p class="claim-origin">📍 ${escapeHtml(b.origin)}</p>
                     <p class="claim-backstory">${escapeHtml(b.backstory || "")}</p>
@@ -2081,9 +3233,10 @@
 
         root.innerHTML = `
             <a class="back-link" href="#/clan">← Back to Clan</a>
+            ${switcher}
             <header class="claim-header">
                 <h1>🎟️ Choose your new cat!</h1>
-                <p>Three cats wandered into your clan. Pick one — the others will scamper off.</p>
+                <p>Six cats wandered into your clan. Pick one — common faces show up more often, while legendary visitors are much harder to spot.</p>
             </header>
             <section class="claim-grid">${choices}</section>
         `;
@@ -2095,6 +3248,7 @@
                 claimCat(breedId);
             });
         });
+        wireCollectionThemeSwitch(root, "/clan");
     }
 
     function renderStatBar(value) {
@@ -2139,9 +3293,8 @@
     }
 
     function renderCatDetail(root, breedId) {
-        const cs = clanState();
-        const cat = cs.cats.find(c => c.breedId === breedId);
-        const breed = window.Clan.findBreed(breedId);
+        const cat = findOwnedCatEntry(breedId);
+        const breed = catSpecFor(breedId);
         if (!cat || !breed) {
             navigate("/clan");
             return;
@@ -2153,9 +3306,10 @@
 
         root.innerHTML = `
             <a class="back-link" href="#/clan">← Back to Clan</a>
+            ${renderCollectionThemeSwitch("cats")}
             <section class="cat-detail">
                 <div class="cat-detail-art">
-                    <div class="cat-detail-svg" id="cat-stage">${window.Cats.breedSvg(breed.appearance, mood.expression)}</div>
+                    <div class="cat-detail-svg" id="cat-stage">${renderCatArt(breedId, mood.expression)}</div>
                     <div class="cat-mood-tag mood-${mood.label.toLowerCase()}">${mood.label}</div>
                 </div>
                 <div class="cat-detail-info">
@@ -2163,7 +3317,7 @@
                         <span class="cat-name" id="cat-name">${escapeHtml(cat.name)}</span>
                         <button type="button" class="link-btn" id="rename-btn">✏️ rename</button>
                     </h1>
-                    <p class="cat-archetype">${escapeHtml(breed.breed)} · ${escapeHtml(breed.archetype)}</p>
+                    <p class="cat-archetype">${escapeHtml(breed.breed)} ${renderRarityBadge(breed.rarity)} · ${escapeHtml(breed.archetype)}</p>
                     <p class="cat-origin">📍 From ${escapeHtml(breed.origin)} · adopted ${escapeHtml(adoptedDate)}</p>
                     ${breed.backstory ? `<p class="cat-backstory">📖 ${escapeHtml(breed.backstory)}</p>` : ""}
 
@@ -2211,13 +3365,14 @@
         $$(".action-btn").forEach(btn => {
             btn.addEventListener("click", () => doInteraction(btn.dataset.act, breedId, root));
         });
+        wireCollectionThemeSwitch(root, "/clan");
     }
 
     function doInteraction(kind, breedId, root) {
-        const cs = clanState();
-        const cat = cs.cats.find(c => c.breedId === breedId);
+        const cat = findOwnedCatEntry(breedId);
         if (!cat) return;
-        const breed = window.Clan.findBreed(breedId);
+        const breed = catSpecFor(breedId);
+        if (!breed) return;
 
         // Apply the boost
         const boost = { pet: 5, play: 10, treat: 15, chat: 3 }[kind] || 0;
@@ -2226,7 +3381,7 @@
         saveState();
 
         // Pick a phrase
-        const phrase = window.Clan.reactionPhrase(breedId, kind);
+        const phrase = catReactionPhraseFor(breedId, kind);
         showCatBubble(phrase);
 
         // Animate the cat
@@ -2240,7 +3395,7 @@
 
             // Swap to a happier expression
             const expression = kind === "pet" ? "love" : (kind === "play" ? "cheering" : (kind === "treat" ? "happy" : "wave"));
-            stage.innerHTML = window.Cats.breedSvg(breed.appearance, expression);
+            stage.innerHTML = renderCatArt(breedId, expression);
 
             // Drift a heart/sparkle up from the cat
             spawnFloater(stage, kind);
@@ -2248,7 +3403,7 @@
             // Restore mood after a bit
             setTimeout(() => {
                 const mood = window.Clan.moodFor(window.Clan.currentHappiness(cat));
-                stage.innerHTML = window.Cats.breedSvg(breed.appearance, mood.expression);
+                stage.innerHTML = renderCatArt(breedId, mood.expression);
             }, 1400);
         }
 
@@ -2292,12 +3447,428 @@
         }
     }
 
+    function animalMoodEmoji(label) {
+        if (label === "Sleepy") return "😴";
+        if (label === "Restless") return "🫣";
+        if (label === "Content") return "🙂";
+        if (label === "Happy") return "😄";
+        return "😍";
+    }
+
+    function renderAnimalCollection(root) {
+        const progress = animalsState();
+        const total = window.Animals.totalPets();
+        const originals = (progress.pets || []).length;
+        const hybrids = animalHybridEntries().length;
+        const own = originals + hybrids;
+        const tickets = progress.claimTickets || 0;
+        const potions = sparklePotionCount();
+        const switcher = renderCollectionThemeSwitch("animals");
+
+        if (own === 0 && tickets === 0) {
+            root.innerHTML = `
+                <a class="back-link" href="#/">← Home</a>
+                ${switcher}
+                <section class="clan-empty">
+                    <div class="clan-empty-cat">${window.Animals.svg("wave", "meadow")}</div>
+                    <h1>Your pet haven is waiting!</h1>
+                    <p>Score <strong>100%</strong> on any practice set or mock exam to earn a 🎟️ <strong>Pet Ticket</strong>. Spend the ticket to choose a new pet for your haven.</p>
+                    <p>There are <strong>${total}</strong> original pets to collect — each with its own personality, traits, and little world.</p>
+                    <a class="primary-btn" href="#/">Start a quiz →</a>
+                </section>
+            `;
+            wireCollectionThemeSwitch(root, "/clan");
+            return;
+        }
+
+        const petCards = animalCompanionEntries().map(pet => {
+            const id = animalEntryId(pet);
+            const spec = animalSpecFor(id);
+            if (!spec) return "";
+            const happy = window.Animals.currentHappiness(pet);
+            const mood = window.Animals.moodFor(happy);
+            return `
+                <a class="clan-card mood-${mood.label.toLowerCase()}" href="#/clan/pet/${id}">
+                    <div class="clan-card-svg">${renderAnimalArt(id, mood.expression)}</div>
+                    <h3>${escapeHtml(pet.name)}</h3>
+                    <p class="clan-card-breed">${escapeHtml(spec.species)} ${renderRarityBadge(spec.rarity)}${renderAnimalVariantBadges(spec)}</p>
+                    <p class="clan-card-mood">${animalMoodEmoji(mood.label)} ${mood.label}</p>
+                    <div class="clan-card-bar"><span style="width:${happy}%"></span></div>
+                </a>
+            `;
+        }).join("");
+
+        const ticketsBlock = tickets > 0 ? `
+            <div class="clan-tickets-banner">
+                <div class="clan-tickets-icon">🎟️</div>
+                <div>
+                    <strong>${tickets} Pet Ticket${tickets === 1 ? "" : "s"} ready to spend!</strong>
+                    <p>Pick your next adorable companion.</p>
+                </div>
+                <a class="primary-btn pulse-btn" href="#/clan/claim">Claim a pet 🐾</a>
+            </div>
+        ` : `
+            <p class="clan-tip">Score 100% on any quiz to earn a new 🎟️ Pet Ticket.</p>
+        `;
+
+        const ctaButtons = [];
+        if (originals > 1 || (originals > 0 && potions > 0)) {
+            ctaButtons.push(`<a class="park-cta" href="#/clan/combine">🧬 Combine two pets <span class="park-cta-sub">(make a funny hybrid)</span></a>`);
+        }
+        if (own > 0) {
+            ctaButtons.push(`<a class="park-cta" href="#/clan/park">🌿 Visit the Meadow <span class="park-cta-sub">(take up to 5 pets)</span></a>`);
+        }
+        const collectionCtas = ctaButtons.length ? `<div class="collection-cta-stack">${ctaButtons.join("")}</div>` : "";
+
+        root.innerHTML = `
+            <a class="back-link" href="#/">← Home</a>
+            ${switcher}
+            <header class="clan-header">
+                <h1>🦊 ${escapeHtml(customName())}'s Pet Haven</h1>
+                <p>${originals} / ${total} original pets collected · ${hybrids} special result${hybrids === 1 ? "" : "s"} created · ${potions} sparkle potion${potions === 1 ? "" : "s"} stored</p>
+                <div class="clan-progress-bar"><span style="width:${pct(originals, total)}%"></span></div>
+            </header>
+            ${ticketsBlock}
+            ${collectionCtas}
+            <section class="clan-grid">${petCards}</section>
+        `;
+        wireCollectionThemeSwitch(root, "/clan");
+    }
+
+    function renderAnimalClaim(root) {
+        const progress = animalsState();
+        const switcher = renderCollectionThemeSwitch("animals");
+        const tickets = progress.claimTickets || 0;
+        const potions = sparklePotionCount();
+        if ((progress.claimTickets || 0) <= 0) {
+            root.innerHTML = `
+                <a class="back-link" href="#/clan">← Back to Pets</a>
+                ${switcher}
+                <section class="empty">
+                    <p>No tickets yet! Score 100% on any quiz to earn one.</p>
+                </section>
+            `;
+            wireCollectionThemeSwitch(root, "/clan");
+            return;
+        }
+
+        const ownedIds = progress.pets.map(p => p.petId);
+        const candidates = window.Animals.pickCandidates(ownedIds);
+
+        const choices = candidates.map(pet => {
+            const stats = pet.stats;
+            const traitChips = pet.traits.map(t => `<span class="trait-chip">${escapeHtml(t)}</span>`).join("");
+            return `
+                <article class="claim-choice" data-pet="${pet.id}">
+                    <div class="claim-svg">${window.Animals.petSvg(pet, "happy")}</div>
+                    <h3>${escapeHtml(pet.species)}</h3>
+                    ${renderRarityBadge(pet.rarity)}
+                    <p class="claim-archetype">${escapeHtml(pet.archetype)}</p>
+                    <p class="claim-origin">📍 ${escapeHtml(pet.habitat)}</p>
+                    <p class="claim-backstory">${escapeHtml(pet.backstory || "")}</p>
+                    <div class="claim-traits">${traitChips}</div>
+                    <ul class="claim-stats">
+                        <li><span>🤗 Cuddly</span> ${renderStatBar(stats.cuddliness)}</li>
+                        <li><span>🪶 Playful</span> ${renderStatBar(stats.playfulness)}</li>
+                        <li><span>🧠 Clever</span> ${renderStatBar(stats.cleverness)}</li>
+                        <li><span>😼 Mischief</span> ${renderStatBar(stats.mischief)}</li>
+                        <li><span>💬 Talkative</span> ${renderStatBar(stats.talk)}</li>
+                    </ul>
+                    <p class="claim-fact">💡 ${escapeHtml(pet.funFact)}</p>
+                    <button type="button" class="primary-btn pulse-btn pick-animal-btn">I choose you, ${escapeHtml(pet.defaultName)}!</button>
+                </article>
+            `;
+        }).join("") + `
+            <article class="claim-choice claim-choice-potion">
+                <div class="claim-svg potion-card-art">
+                    ${window.Animals.svg("love", "lagoon")}
+                    <span class="potion-card-badge">Sparkle Potion</span>
+                </div>
+                <h3>✨ Sparkle Potion</h3>
+                <p class="claim-archetype">Bright-colour upgrade</p>
+                <p class="claim-origin">🎟️ Costs 1 Pet Ticket · 🧪 You own ${potions}</p>
+                <p class="claim-backstory">Use one in the combine screen with two original pets to make a glowing sparkle result. If both selected pets are the same type, it creates a sparkle version of that pet instead.</p>
+                <button type="button" class="primary-btn pulse-btn" id="buy-sparkle-potion-btn">Buy 1 Sparkle Potion</button>
+            </article>
+        `;
+
+        root.innerHTML = `
+            <a class="back-link" href="#/clan">← Back to Pets</a>
+            ${switcher}
+            <header class="claim-header">
+                <h1>🎟️ Spend your Pet Ticket!</h1>
+                <p>You have <strong>${tickets}</strong> Pet Ticket${tickets === 1 ? "" : "s"} and <strong>${potions}</strong> Sparkle Potion${potions === 1 ? "" : "s"}. Pick a new pet or stock up on magic glow for the combine screen.</p>
+            </header>
+            <section class="claim-grid">${choices}</section>
+        `;
+
+        $$(".pick-animal-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const petId = btn.closest(".claim-choice").dataset.pet;
+                claimAnimalPet(petId);
+            });
+        });
+        const buyPotionBtn = $("#buy-sparkle-potion-btn");
+        if (buyPotionBtn) {
+            buyPotionBtn.addEventListener("click", buySparklePotion);
+        }
+        wireCollectionThemeSwitch(root, "/clan");
+    }
+
+    function claimAnimalPet(petId) {
+        const progress = animalsState();
+        if ((progress.claimTickets || 0) <= 0) return;
+        const spec = window.Animals.findPet(petId);
+        if (!spec) return;
+        if (progress.pets.some(p => p.petId === petId)) return;
+
+        progress.pets.push({
+            petId,
+            name: spec.defaultName,
+            dateISO: new Date().toISOString(),
+            lastInteractedISO: new Date().toISOString(),
+            happiness: 80
+        });
+        progress.claimTickets--;
+        saveState();
+
+        window.Animals.popIn({
+            expression: "cheering",
+            theme: window.Animals.pickTheme(),
+            message: `Welcome to the haven, ${spec.defaultName}!`,
+            duration: 4000,
+            side: "left"
+        });
+        setTimeout(() => window.Animals.popIn({
+            expression: "love",
+            theme: window.Animals.pickTheme(),
+            message: "Your pet haven grows!",
+            duration: 3500,
+            side: "right"
+        }), 700);
+
+        navigate(`/clan/pet/${petId}`);
+    }
+
+    function buySparklePotion() {
+        const progress = animalsState();
+        if ((progress.claimTickets || 0) <= 0) return;
+        progress.claimTickets--;
+        progress.sparklePotions = (progress.sparklePotions || 0) + 1;
+        saveState();
+
+        window.Animals.popIn({
+            expression: "love",
+            theme: window.Animals.pickTheme(),
+            message: "Sparkle Potion stocked! ✨",
+            duration: 3200,
+            side: "right"
+        });
+        render();
+    }
+
+    function renderAnimalDetail(root, petId) {
+        const pet = findOwnedAnimalEntry(petId);
+        const spec = animalSpecFor(petId);
+        if (!pet || !spec) {
+            navigate("/clan");
+            return;
+        }
+        const happy = window.Animals.currentHappiness(pet);
+        const mood = window.Animals.moodFor(happy);
+        const stats = spec.stats;
+        const adoptedDate = new Date(pet.dateISO).toLocaleDateString();
+
+        root.innerHTML = `
+            <a class="back-link" href="#/clan">← Back to Pets</a>
+            ${renderCollectionThemeSwitch("animals")}
+            <section class="cat-detail">
+                <div class="cat-detail-art">
+                    <div class="cat-detail-svg" id="cat-stage">${renderAnimalArt(petId, mood.expression)}</div>
+                    <div class="cat-mood-tag mood-${mood.label.toLowerCase()}">${mood.label}</div>
+                </div>
+                <div class="cat-detail-info">
+                    <h1>
+                        <span class="cat-name" id="cat-name">${escapeHtml(pet.name)}</span>
+                        <button type="button" class="link-btn" id="rename-btn">✏️ rename</button>
+                    </h1>
+                    <p class="cat-archetype">${escapeHtml(spec.species)} ${renderRarityBadge(spec.rarity)}${renderAnimalVariantBadges(spec)} · ${escapeHtml(spec.archetype)}</p>
+                    <p class="cat-origin">📍 From ${escapeHtml(spec.habitat)} · adopted ${escapeHtml(adoptedDate)}</p>
+                    ${spec.backstory ? `<p class="cat-backstory">📖 ${escapeHtml(spec.backstory)}</p>` : ""}
+
+                    <div class="cat-happiness">
+                        <div class="cat-happiness-label">Happiness <strong id="happiness-num">${happy}%</strong></div>
+                        <div class="cat-happiness-bar"><span id="happiness-bar" style="width:${happy}%"></span></div>
+                    </div>
+
+                    <div class="cat-traits">
+                        ${spec.traits.map(t => `<span class="trait-chip">${escapeHtml(t)}</span>`).join("")}
+                    </div>
+
+                    <ul class="cat-stats">
+                        <li><span>🤗 Cuddly</span> ${renderStatBar(stats.cuddliness)}</li>
+                        <li><span>🪶 Playful</span> ${renderStatBar(stats.playfulness)}</li>
+                        <li><span>🧠 Clever</span> ${renderStatBar(stats.cleverness)}</li>
+                        <li><span>😼 Mischief</span> ${renderStatBar(stats.mischief)}</li>
+                        <li><span>💬 Talkative</span> ${renderStatBar(stats.talk)}</li>
+                    </ul>
+
+                    <p class="cat-funfact">💡 ${escapeHtml(spec.funFact)}</p>
+
+                    <div class="cat-actions">
+                        <button type="button" class="action-btn" data-act="pet">🤚 Pat <span class="boost">+5</span></button>
+                        <button type="button" class="action-btn" data-act="play">🪀 Play <span class="boost">+10</span></button>
+                        <button type="button" class="action-btn" data-act="treat">🍓 Snack <span class="boost">+15</span></button>
+                        <button type="button" class="action-btn" data-act="chat">💬 Chat <span class="boost">+3</span></button>
+                    </div>
+                    <div class="cat-bubble-area" id="cat-bubble-area" aria-live="polite"></div>
+                </div>
+            </section>
+        `;
+
+        $("#rename-btn").addEventListener("click", () => {
+            const name = prompt("What's their new name?", pet.name);
+            if (name && name.trim()) {
+                pet.name = name.trim().slice(0, 24);
+                saveState();
+                renderAnimalDetail(root, petId);
+            }
+        });
+
+        $$(".action-btn").forEach(btn => {
+            btn.addEventListener("click", () => doAnimalInteraction(btn.dataset.act, petId, root));
+        });
+        wireCollectionThemeSwitch(root, "/clan");
+    }
+
+    function doAnimalInteraction(kind, petId, root) {
+        const pet = findOwnedAnimalEntry(petId);
+        if (!pet) return;
+        const spec = animalSpecFor(petId);
+        if (!spec) return;
+
+        const boost = { pet: 5, play: 10, treat: 15, chat: 3 }[kind] || 0;
+        pet.happiness = Math.min(100, window.Animals.currentHappiness(pet) + boost);
+        pet.lastInteractedISO = new Date().toISOString();
+        saveState();
+
+        showCatBubble(animalReactionPhraseFor(petId, kind));
+
+        const stage = $("#cat-stage");
+        if (stage) {
+            stage.classList.remove("anim-bounce", "anim-wiggle", "anim-spin", "anim-shake");
+            void stage.offsetWidth;
+            const animMap = { pet: "anim-bounce", play: "anim-spin", treat: "anim-wiggle", chat: "anim-shake" };
+            stage.classList.add(animMap[kind] || "anim-bounce");
+            const expression = kind === "pet" ? "love" : (kind === "play" ? "cheering" : (kind === "treat" ? "happy" : "wave"));
+            stage.innerHTML = renderAnimalArt(petId, expression);
+            spawnFloater(stage, kind);
+            setTimeout(() => {
+                const mood = window.Animals.moodFor(window.Animals.currentHappiness(pet));
+                stage.innerHTML = renderAnimalArt(petId, mood.expression);
+            }, 1400);
+        }
+
+        const happy = window.Animals.currentHappiness(pet);
+        const num = $("#happiness-num");
+        const bar = $("#happiness-bar");
+        if (num) num.textContent = happy + "%";
+        if (bar) bar.style.width = happy + "%";
+    }
+
+    function renderAnimalParkSelect(root) {
+        const progress = animalsState();
+        if (!animalCompanionEntries().length) { navigate("/clan"); return; }
+        progress.parkSelection = progress.parkSelection || [];
+        const switcher = renderCollectionThemeSwitch("animals");
+        const selected = new Set(progress.parkSelection);
+
+        const petCards = animalCompanionEntries().map(pet => {
+            const id = animalEntryId(pet);
+            const spec = animalSpecFor(id);
+            if (!spec) return "";
+            const isSel = selected.has(id);
+            return `
+                <button type="button" class="park-pick ${isSel ? "is-picked" : ""}" data-id="${id}">
+                    <div class="park-pick-svg">${renderAnimalArt(id, "wave")}</div>
+                    <div class="park-pick-name">${escapeHtml(pet.name)}</div>
+                    <div class="park-pick-breed">${escapeHtml(spec.species)}${spec.hybrid ? " · Hybrid" : ""}${spec.sparkle ? " · Sparkle" : ""}</div>
+                    ${isSel ? `<div class="park-pick-check">✓</div>` : ""}
+                </button>
+            `;
+        }).join("");
+
+        root.innerHTML = `
+            <a class="back-link" href="#/clan">← Back to Pets</a>
+            ${switcher}
+            <header class="park-header">
+                <h1>🌿 Visit the Meadow</h1>
+                <p>Pick up to <strong>5 pets</strong> to take with you.</p>
+            </header>
+            <div class="park-select-bar">
+                <span id="park-select-count">${progress.parkSelection.length} of 5 chosen</span>
+                <button type="button" class="primary-btn pulse-btn" id="park-go-btn" ${progress.parkSelection.length === 0 ? "disabled" : ""}>Off to the Meadow! 🐾</button>
+            </div>
+            <section class="park-pick-grid">${petCards}</section>
+        `;
+
+        $$(".park-pick").forEach(el => {
+            el.addEventListener("click", () => {
+                const id = el.dataset.id;
+                const idx = progress.parkSelection.indexOf(id);
+                if (idx >= 0) {
+                    progress.parkSelection.splice(idx, 1);
+                } else if (progress.parkSelection.length < 5) {
+                    progress.parkSelection.push(id);
+                } else {
+                    return;
+                }
+                saveState();
+                renderAnimalParkSelect(root);
+            });
+        });
+        $("#park-go-btn").addEventListener("click", () => {
+            if (!progress.parkSelection.length) return;
+            navigate("/clan/park/play");
+        });
+        wireCollectionThemeSwitch(root, "/clan");
+    }
+
+    function renderAnimalParkPlay(root) {
+        const progress = animalsState();
+        const ids = progress.parkSelection || [];
+        if (!ids.length) { navigate("/clan/park"); return; }
+        const selectedPets = ids.map(findOwnedAnimalEntry).filter(Boolean);
+        if (!selectedPets.length) { navigate("/clan/park"); return; }
+
+        window.Park.start(root, selectedPets, {
+            onExit: () => {
+                selectedPets.forEach(pet => {
+                    pet.happiness = Math.min(100, window.Animals.currentHappiness(pet) + 12);
+                    pet.lastInteractedISO = new Date().toISOString();
+                });
+                saveState();
+                navigate("/clan");
+            },
+            backHref: "#/clan",
+            title: "🌿 Meadow Visit",
+            blurb: "Tap a pet to pick them up. Click an action to make all your pets react. Have fun!",
+            help: "Drag a pet by clicking and holding. Each one has its own personality - watch how they react!",
+            groupName: "pets",
+            renderPet: (entry, expression) => renderAnimalArt(animalEntryId(entry), expression),
+            resolvePet: entry => animalSpecFor(animalEntryId(entry)),
+            getPetId: entry => animalEntryId(entry),
+            getPetName: (entry, spec) => entry.name || (spec && spec.defaultName) || "Pet",
+            reactionPhrase: (petId, kind) => animalReactionPhraseFor(petId, kind)
+        });
+    }
+
     /* ---------- Stats ---------- */
 
     function countAllQuestions(subjectId) {
         const s = window.SUBJECT_DATA[subjectId];
         if (!s) return 0;
-        return s.mcqs.length + s.short.length + s.long.length;
+        return (s.mcqs || []).length + (s.short || []).length + (s.long || []).length;
     }
 
     function subjectSummary(subjectId) {
@@ -2326,16 +3897,20 @@
     function showResetWarning() {
         // Build a snapshot of what's about to be deleted, so the warning is concrete.
         const cs = state.clan || { cats: [], claimTickets: 0 };
+        const animalProgress = animalsState();
         const totalAnswered = state.stats.totalAnswered;
-        const catCount = (cs.cats || []).length;
+        const catCount = totalCatCompanions();
+        const animalCount = totalAnimalCompanions();
         const tickets = cs.claimTickets || 0;
+        const animalTickets = animalProgress.claimTickets || 0;
+        const sparklePotions = sparklePotionCount();
         const catrisHigh = (state.breaks && state.breaks.catrisHighScore) || 0;
         const invadersHigh = (state.breaks && state.breaks.invadersHighScore) || 0;
         const catanoidHigh = (state.breaks && state.breaks.catanoidHighScore) || 0;
         const highScore = Math.max(catrisHigh, invadersHigh, catanoidHigh);
-        const sessions = SUBJECTS.reduce((n, id) => n + (state.subjects[id].quizSessions || []).length, 0);
-        const namedCats = (cs.cats || []).filter(c => {
-            const breed = window.Clan && window.Clan.findBreed(c.breedId);
+        const sessions = STATE_SUBJECTS.reduce((n, id) => n + (state.subjects[id].quizSessions || []).length, 0);
+        const namedCats = catCompanionEntries().filter(c => {
+            const breed = catSpecFor(catEntryId(c));
             return breed && c.name && c.name !== breed.defaultName;
         }).length;
 
@@ -2354,13 +3929,16 @@
                 <ul class="reset-modal-list">
                     <li><span>📚</span> <strong>${totalAnswered}</strong> questions answered across ${sessions} quiz session${sessions === 1 ? "" : "s"}</li>
                     <li><span>🏆</span> Every best score on every Practice Set and Mock Exam</li>
-                    <li><span>🐾</span> Your <strong>${catCount}</strong> cat${catCount === 1 ? "" : "s"}${namedCats ? ` (including <strong>${namedCats}</strong> custom-named ${namedCats === 1 ? "cat" : "cats"})` : ""} and all their happiness</li>
+                    <li><span>🐾</span> Your <strong>${catCount}</strong> cat companion${catCount === 1 ? "" : "s"}${namedCats ? ` (including <strong>${namedCats}</strong> custom-named ${namedCats === 1 ? "cat" : "cats"})` : ""} and all their happiness</li>
                     <li><span>🎟️</span> ${tickets} unspent Cat Ticket${tickets === 1 ? "" : "s"}</li>
+                    <li><span>🦊</span> Your <strong>${animalCount}</strong> animal companion${animalCount === 1 ? "" : "s"} and all their happiness</li>
+                    <li><span>🎟️</span> ${animalTickets} unspent Pet Ticket${animalTickets === 1 ? "" : "s"}</li>
+                    <li><span>✨</span> ${sparklePotions} Sparkle Potion${sparklePotions === 1 ? "" : "s"}</li>
                     <li><span>🐱</span> All Catris/Invaders/Catanoid high scores (best: <strong>${highScore}</strong>)</li>
                     <li><span>🔥</span> Your current and best streaks</li>
                     <li><span>⏱️</span> Break cooldown timer</li>
                 </ul>
-                <p class="reset-modal-warn">You will need to rebuild your clan from scratch — even cats you adopted weeks ago will be gone forever.</p>
+                <p class="reset-modal-warn">You will need to rebuild both collections from scratch - any cats, pets, and hybrids you earned will be gone forever.</p>
                 <label class="reset-modal-confirm">
                     <input type="checkbox" id="reset-modal-check">
                     <span>I understand this cannot be undone, and I want to delete everything.</span>
@@ -2382,12 +3960,12 @@
         modal.addEventListener("click", (e) => { if (e.target === modal) closeResetModal(); });
         goBtn.addEventListener("click", () => {
             // Final native confirm for the rare double-click misclickers
-            if (!confirm("Last chance — really delete every cat, every score, and start over?")) return;
+            if (!confirm("Last chance - really delete every cat, every pet, every score, and start over?")) return;
             state = defaultState();
             saveState();
             closeResetModal();
             render();
-            window.Cats.popIn({ expression: "wave", message: "Fresh start — let's go!", duration: 3000 });
+            mascotPopIn({ expression: "wave", message: "Fresh start - let's go!", duration: 3000 });
         });
         // Focus the cancel button for safety
         setTimeout(() => document.getElementById("reset-modal-cancel").focus(), 50);
@@ -2401,23 +3979,40 @@
     /* ---------- Custom name ---------- */
 
     function customName() {
-        return (state.settings && state.settings.customName) || "Harper";
+        return savedCustomName() || "Student";
     }
 
     function applyCustomName() {
         const name = customName();
         document.querySelectorAll("[data-name]").forEach(el => { el.textContent = name; });
+        document.title = `${name}'s Study Guide · Term 2 2026`;
+        const meta = document.querySelector('meta[name="description"]');
+        if (meta) meta.setAttribute("content", `${name}'s Study Guide — Term 2 2026`);
+    }
+
+    function applyFooterCaption() {
+        const footer = document.getElementById("footer-caption");
+        if (!footer) return;
+        const year = yearLabel(currentSelectedYear());
+        footer.textContent = year
+            ? `Made with 🐾 for ${customName()} · ${year}`
+            : `Made with 🐾 for ${customName()}`;
     }
 
     /* ---------- Settings page ---------- */
 
-    function renderSettings(root) {
+    function renderSettings(root, draft) {
         const s = state.settings || {};
         const hasKey = !!s.geminiApiKey;
         const cs = state.clan || { cats: [] };
+        const animalProgress = animalsState();
         const totalAnswered = state.stats.totalAnswered;
-        const catCount = (cs.cats || []).length;
+        const catCount = totalCatCompanions();
+        const petCount = totalAnimalCompanions();
+        const potions = sparklePotionCount();
         const lastBackup = s.lastBackupISO ? new Date(s.lastBackupISO).toLocaleString() : "never";
+        const profileDraft = resolveProfileDraft(draft);
+        const activeTheme = currentThemeId();
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
@@ -2430,9 +4025,35 @@
                 <h2>👤 Profile</h2>
                 <label class="settings-field">
                     <span>Your name</span>
-                    <input type="text" id="settings-name" value="${escapeHtml(s.customName || "Harper")}" maxlength="24" placeholder="Harper">
+                    <input type="text" id="settings-name" value="${escapeHtml((s.customName || "").trim())}" maxlength="24" placeholder="Enter your name">
                 </label>
-                <p class="settings-help">Used in greetings on the home page and the brand bar at the top. Cat backstories aren't changed.</p>
+                <p class="settings-help">Used in greetings on the home page and the brand bar at the top. Existing pet backstories and bios aren't changed.</p>
+                ${renderProfileSelectionFields(profileDraft, "settings-profile")}
+                <div class="settings-actions">
+                    <button type="button" class="primary-btn" id="settings-profile-save">Save study profile</button>
+                </div>
+                <p class="settings-help">Changing your year or subjects updates what you see, but hidden subjects keep all their saved progress.</p>
+            </section>
+
+            <section class="settings-section">
+                <h2>🎨 Theme</h2>
+                <p class="settings-help">Choose whether the app uses Cats or Animals for general mascots and which collection earns new tickets by default. Switching theme does <strong>not</strong> delete any cats or pets you've already earned.</p>
+                <div class="theme-switcher settings-theme-switcher" role="radiogroup" aria-label="Choose app theme">
+                    <button type="button" class="theme-switch-btn ${activeTheme === "cats" ? "is-active" : ""}" data-settings-theme="cats" aria-pressed="${activeTheme === "cats" ? "true" : "false"}">
+                        <span class="theme-switch-emoji">🐱</span>
+                        <span class="theme-switch-copy">
+                            <strong>Cats</strong>
+                            <span>${catCount} collected · ${(cs.claimTickets || 0)} ticket${(cs.claimTickets || 0) === 1 ? "" : "s"}</span>
+                        </span>
+                    </button>
+                    <button type="button" class="theme-switch-btn ${activeTheme === "animals" ? "is-active" : ""}" data-settings-theme="animals" aria-pressed="${activeTheme === "animals" ? "true" : "false"}">
+                        <span class="theme-switch-emoji">🦊</span>
+                        <span class="theme-switch-copy">
+                            <strong>Animals</strong>
+                            <span>${petCount} collected · ${(animalProgress.claimTickets || 0)} ticket${(animalProgress.claimTickets || 0) === 1 ? "" : "s"} · ${potions} potion${potions === 1 ? "" : "s"}</span>
+                        </span>
+                    </button>
+                </div>
             </section>
 
             <section class="settings-section">
@@ -2456,12 +4077,12 @@
 
             <section class="settings-section">
                 <h2>💾 Backup &amp; restore</h2>
-                <p class="settings-help">Save a complete snapshot of your progress (cats, scores, answers, settings) to a JSON file you can keep or move to another device.</p>
+                <p class="settings-help">Save a complete snapshot of your progress (cats, pets, scores, answers, settings) to a JSON file you can keep or move to another device.</p>
                 <div class="settings-actions">
                     <button type="button" class="primary-btn" id="settings-save-state">💾 Save state to file</button>
                     <button type="button" class="ghost-btn" id="settings-load-state">📂 Load state from file</button>
                 </div>
-                <p class="settings-help">Right now you have <strong>${totalAnswered}</strong> questions answered and <strong>${catCount}</strong> cat${catCount === 1 ? "" : "s"}. Last backup: ${escapeHtml(lastBackup)}.</p>
+                <p class="settings-help">Right now you have <strong>${totalAnswered}</strong> questions answered, <strong>${catCount}</strong> cat${catCount === 1 ? "" : "s"}, and <strong>${petCount}</strong> animal pet${petCount === 1 ? "" : "s"}. Last backup: ${escapeHtml(lastBackup)}.</p>
             </section>
 
             <section class="settings-section settings-danger">
@@ -2471,9 +4092,34 @@
         `;
 
         $("#settings-name").addEventListener("blur", (e) => {
-            state.settings.customName = (e.target.value || "Harper").trim().slice(0, 24) || "Harper";
+            state.settings.customName = (e.target.value || "").trim().slice(0, 24);
             saveState();
             applyCustomName();
+            applyFooterCaption();
+        });
+
+        bindProfileSelectionForm(
+            root,
+            profileDraft,
+            "settings-profile",
+            nextDraft => renderSettings(root, nextDraft),
+            (yearId, selectedSubjects) => {
+                saveStudyProfile(yearId, selectedSubjects);
+                renderSettings(root);
+                mascotPopIn({ expression: "proud", message: "Study profile updated!", duration: 2200 });
+            }
+        );
+
+        $$("[data-settings-theme]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                setThemePreference(btn.dataset.settingsTheme);
+                renderSettings(root);
+                mascotPopIn({
+                    expression: "proud",
+                    message: btn.dataset.settingsTheme === "animals" ? "Animals theme activated!" : "Cats theme activated!",
+                    duration: 2200
+                });
+            });
         });
 
         const keyInput = $("#settings-key");
@@ -2528,7 +4174,7 @@
         URL.revokeObjectURL(url);
         state.settings.lastBackupISO = new Date().toISOString();
         saveState();
-        window.Cats.popIn({ expression: "wave", message: "Backup saved!", duration: 2400 });
+        mascotPopIn({ expression: "wave", message: "Backup saved!", duration: 2400 });
     }
 
     function loadStateFromFile() {
@@ -2564,7 +4210,7 @@
             <div class="reset-modal" role="dialog" aria-modal="true">
                 <div class="reset-modal-icon">📂</div>
                 <h2>Replace your progress with this file?</h2>
-                <p class="reset-modal-lead">Loading this file will <strong>overwrite all your current progress</strong>: cats, exam scores, settings, the lot. Make sure you've backed up first if you want to keep anything.</p>
+                <p class="reset-modal-lead">Loading this file will <strong>overwrite all your current progress</strong>: cats, pets, exam scores, settings, the lot. Make sure you've backed up first if you want to keep anything.</p>
                 <label class="reset-modal-confirm">
                     <input type="checkbox" id="load-modal-check">
                     <span>I understand this replaces my current progress.</span>
@@ -2586,8 +4232,9 @@
             saveState();
             closeResetModal();
             applyCustomName();
+            applyFooterCaption();
             render();
-            window.Cats.popIn({ expression: "cheering", message: "Progress restored!", duration: 3000 });
+            mascotPopIn({ expression: "cheering", message: "Progress restored!", duration: 3000 });
         });
         setTimeout(() => document.getElementById("load-modal-cancel").focus(), 50);
     }
@@ -2595,5 +4242,6 @@
     generatePracticeExams();
     bindGlobalEvents();
     applyCustomName();
+    applyFooterCaption();
     if (document.readyState !== "loading") render();
 })();

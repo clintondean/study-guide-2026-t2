@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const window = {};
 const root = path.join(__dirname, '..', '..');
-const files = ['data/commerce.js', 'data/english.js', 'data/geography.js', 'data/maths.js'];
+const files = ['data/commerce.js', 'data/english.js', 'data/geography.js', 'data/geography-7.js', 'data/maths.js', 'data/maths-core.js', 'data/music-7.js', 'data/science.js', 'data/science-9.js'];
 for (const f of files) eval(fs.readFileSync(path.join(root, f), 'utf8'));
 
 let problems = 0;
@@ -32,6 +32,11 @@ for (const id of Object.keys(window.SUBJECT_DATA)) {
         if (!q.id) fail(`question missing id: ${JSON.stringify(q).slice(0, 80)}`);
         if (!q.q) fail(`${q.id} missing q text`);
         if (!topicIds.has(q.topic)) fail(`${q.id} unknown topic '${q.topic}'`);
+        if (q.diagram) {
+            if (typeof q.diagram !== 'object') fail(`${q.id} diagram must be an object`);
+            if (!q.diagram.svg || typeof q.diagram.svg !== 'string') fail(`${q.id} diagram missing svg`);
+            if (!q.diagram.alt || typeof q.diagram.alt !== 'string') fail(`${q.id} diagram missing alt`);
+        }
         if (q.options) {
             if (!Array.isArray(q.options) || q.options.length < 2) fail(`${q.id} bad options`);
             if (typeof q.answer !== 'number' || q.answer < 0 || q.answer >= q.options.length) {

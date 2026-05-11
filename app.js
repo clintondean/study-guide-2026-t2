@@ -40,6 +40,43 @@
         out[year.id] = year;
         return out;
     }, Object.create(null));
+    const VISUAL_THEMES = [
+        {
+            id: "sunset",
+            emoji: "🌅",
+            label: "Sunset",
+            blurb: "Warm peach and honey tones.",
+            swatches: ["#e07a3a", "#ffd9b3", "#fff5ec"]
+        },
+        {
+            id: "ocean",
+            emoji: "🌊",
+            label: "Ocean",
+            blurb: "Cool blue and sea-glass highlights.",
+            swatches: ["#2f8fce", "#bfe7ff", "#e9f7ff"]
+        },
+        {
+            id: "meadow",
+            emoji: "🌿",
+            label: "Meadow",
+            blurb: "Soft mint and grassy greens.",
+            swatches: ["#5f9d63", "#cfeccf", "#f2fbf0"]
+        },
+        {
+            id: "berry",
+            emoji: "🍓",
+            label: "Berry",
+            blurb: "Rosy pink with jammy accents.",
+            swatches: ["#c45486", "#ffd1e6", "#fff2f8"]
+        },
+        {
+            id: "twilight",
+            emoji: "🌙",
+            label: "Twilight",
+            blurb: "Indigo glow with lilac contrast.",
+            swatches: ["#6d5bd0", "#d8d1ff", "#f3f1ff"]
+        }
+    ];
 
     /* ---------- Practice exam generator (deterministic) ---------- */
 
@@ -151,7 +188,8 @@
                 geminiApiKey: "",         // empty = AI features disabled
                 selectedYear: "",
                 selectedSubjects: [],
-                themePreference: "cats"
+                themePreference: "cats",
+                visualTheme: "sunset"
             },
             stats: { totalAnswered: 0, totalCorrect: 0, currentStreak: 0, bestStreak: 0 },
             clan: {
@@ -187,6 +225,8 @@
         for (const k of Object.keys(def.settings)) {
             if (s.settings[k] === undefined) s.settings[k] = def.settings[k];
         }
+        s.settings.themePreference = normalizeThemePreference(s.settings.themePreference);
+        s.settings.visualTheme = normalizeVisualTheme(s.settings.visualTheme);
         if (!s.subjects) s.subjects = def.subjects;
         for (const subjId of STATE_SUBJECTS) {
             if (!s.subjects[subjId]) s.subjects[subjId] = def.subjects[subjId];
@@ -358,8 +398,43 @@
         return themeId === "animals" ? "animals" : "cats";
     }
 
+    function normalizeVisualTheme(themeId) {
+        return VISUAL_THEMES.some(theme => theme.id === themeId) ? themeId : "sunset";
+    }
+
     function currentThemeId() {
         return normalizeThemePreference(state.settings && state.settings.themePreference);
+    }
+
+    function currentVisualTheme() {
+        return normalizeVisualTheme(state.settings && state.settings.visualTheme);
+    }
+
+    function visualThemeMeta(themeId) {
+        return VISUAL_THEMES.find(theme => theme.id === normalizeVisualTheme(themeId)) || VISUAL_THEMES[0];
+    }
+
+    function applyVisualTheme() {
+        document.documentElement.setAttribute("data-visual-theme", currentVisualTheme());
+    }
+
+    function renderVisualThemeSelector(activeId) {
+        return `
+            <div class="theme-switcher settings-theme-switcher settings-visual-theme-switcher" role="radiogroup" aria-label="Choose colour theme">
+                ${VISUAL_THEMES.map(theme => `
+                    <button type="button" class="theme-switch-btn ${theme.id === activeId ? "is-active" : ""}" data-visual-theme="${theme.id}" aria-pressed="${theme.id === activeId ? "true" : "false"}">
+                        <span class="theme-switch-emoji">${theme.emoji}</span>
+                        <span class="theme-switch-copy">
+                            <strong>${theme.label}</strong>
+                            <span>${theme.blurb}</span>
+                            <span class="theme-preview-palette" aria-hidden="true">
+                                ${theme.swatches.map(color => `<span class="theme-preview-dot" style="--swatch:${color}"></span>`).join("")}
+                            </span>
+                        </span>
+                    </button>
+                `).join("")}
+            </div>
+        `;
     }
 
     function themeApi(themeId) {
@@ -3964,6 +4039,9 @@
             state = defaultState();
             saveState();
             closeResetModal();
+            applyCustomName();
+            applyVisualTheme();
+            applyFooterCaption();
             render();
             mascotPopIn({ expression: "wave", message: "Fresh start - let's go!", duration: 3000 });
         });
@@ -4013,6 +4091,7 @@
         const lastBackup = s.lastBackupISO ? new Date(s.lastBackupISO).toLocaleString() : "never";
         const profileDraft = resolveProfileDraft(draft);
         const activeTheme = currentThemeId();
+        const activeVisualTheme = currentVisualTheme();
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
@@ -4036,7 +4115,13 @@
             </section>
 
             <section class="settings-section">
-                <h2>🎨 Theme</h2>
+                <h2>🎨 Theme selector</h2>
+                <p class="settings-help">Choose a colour theme for the whole app. This changes the look only — it won't affect your mascots, pets, or progress.</p>
+                ${renderVisualThemeSelector(activeVisualTheme)}
+            </section>
+
+            <section class="settings-section">
+                <h2>🐾 Mascot &amp; collection theme</h2>
                 <p class="settings-help">Choose whether the app uses Cats or Animals for general mascots and which collection earns new tickets by default. Switching theme does <strong>not</strong> delete any cats or pets you've already earned.</p>
                 <div class="theme-switcher settings-theme-switcher" role="radiogroup" aria-label="Choose app theme">
                     <button type="button" class="theme-switch-btn ${activeTheme === "cats" ? "is-active" : ""}" data-settings-theme="cats" aria-pressed="${activeTheme === "cats" ? "true" : "false"}">
@@ -4117,6 +4202,19 @@
                 mascotPopIn({
                     expression: "proud",
                     message: btn.dataset.settingsTheme === "animals" ? "Animals theme activated!" : "Cats theme activated!",
+                    duration: 2200
+                });
+            });
+        });
+        $$("[data-visual-theme]").forEach(btn => {
+            btn.addEventListener("click", () => {
+                state.settings.visualTheme = normalizeVisualTheme(btn.dataset.visualTheme);
+                saveState();
+                applyVisualTheme();
+                renderSettings(root);
+                mascotPopIn({
+                    expression: "proud",
+                    message: `${visualThemeMeta(btn.dataset.visualTheme).label} theme activated!`,
                     duration: 2200
                 });
             });
@@ -4232,6 +4330,7 @@
             saveState();
             closeResetModal();
             applyCustomName();
+            applyVisualTheme();
             applyFooterCaption();
             render();
             mascotPopIn({ expression: "cheering", message: "Progress restored!", duration: 3000 });
@@ -4242,6 +4341,7 @@
     generatePracticeExams();
     bindGlobalEvents();
     applyCustomName();
+    applyVisualTheme();
     applyFooterCaption();
     if (document.readyState !== "loading") render();
 })();

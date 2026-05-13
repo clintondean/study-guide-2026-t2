@@ -212,7 +212,8 @@
                 lastBreakStartISO: null,
                 catrisHighScore: 0,
                 invadersHighScore: 0,
-                catanoidHighScore: 0
+                catanoidHighScore: 0,
+                dangerNoodleHighScore: 0
             }
         };
     }
@@ -248,6 +249,9 @@
         if (!Array.isArray(s.hybrids.cats)) s.hybrids.cats = [];
         if (!Array.isArray(s.hybrids.animals)) s.hybrids.animals = [];
         if (!s.breaks) s.breaks = def.breaks;
+        for (const k of Object.keys(def.breaks)) {
+            if (s.breaks[k] === undefined) s.breaks[k] = def.breaks[k];
+        }
         if (!s.stats) s.stats = def.stats;
         return s;
     }
@@ -809,6 +813,7 @@
         if (window.CatTetris && window.CatTetris.stop) window.CatTetris.stop();
         if (window.CatInvaders && window.CatInvaders.stop) window.CatInvaders.stop();
         if (window.Catanoid && window.Catanoid.stop) window.Catanoid.stop();
+        if (window.DangerNoodle && window.DangerNoodle.stop) window.DangerNoodle.stop();
         // If leaving the break section entirely, end the shared session.
         if (!goingToBreak && window.BreakSession) window.BreakSession.end();
         if (!goingToBreak && window._breakLockoutTimer) {
@@ -832,6 +837,7 @@
             if (route[1] === "catris") return renderBreakGame(root, "catris");
             if (route[1] === "invaders") return renderBreakGame(root, "invaders");
             if (route[1] === "catanoid") return renderBreakGame(root, "catanoid");
+            if (route[1] === "danger-noodle") return renderBreakGame(root, "danger-noodle");
             return renderBreakHub(root);
         }
         if (route[0] === "clan") {
@@ -3009,6 +3015,14 @@
             blurb: "Bounce the ball, smash the brick-cats.",
             color: "#ff7f51",
             highKey: "catanoidHighScore"
+        },
+        {
+            id: "danger-noodle",
+            name: "Danger Noodle",
+            icon: "🐍",
+            blurb: "Classic Snake with two fruit slots and wild bonus fruit.",
+            color: "#70c44f",
+            highKey: "dangerNoodleHighScore"
         }
     ];
 
@@ -3059,7 +3073,7 @@
             <header class="break-hub-header">
                 <div>
                     <h1>☕ Take a break</h1>
-                    <p>Pick a game. The 5-minute timer is shared across all three — switch games freely.</p>
+                    <p>Pick a game. The 5-minute timer is shared across every game — switch freely whenever you like.</p>
                 </div>
                 <div class="tetris-timer-wrap">
                     <div class="tetris-timer-label" id="break-hub-label">Time left</div>
@@ -3119,6 +3133,7 @@
         if (gameId === "catris") return window.CatTetris.start(root, opts);
         if (gameId === "invaders") return window.CatInvaders.start(root, opts);
         if (gameId === "catanoid") return window.Catanoid.start(root, opts);
+        if (gameId === "danger-noodle") return window.DangerNoodle.start(root, opts);
     }
 
     function renderBreakLockout(root, remainingMs) {

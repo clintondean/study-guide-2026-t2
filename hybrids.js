@@ -2,6 +2,13 @@
     "use strict";
 
     const RARITY_ORDER = ["common", "uncommon", "rare", "ultra-rare", "legendary"];
+    const CAT_EAR_PRIORITY = ["normal", "small", "big", "folded", "curl", "tufted"];
+    const DISTINCTIVE_EAR_KINDS = new Set(["rabbit", "fox", "fennec", "alpaca", "deer", "koala", "panda", "cockatiel", "frog"]);
+    const DISTINCTIVE_TAIL_KINDS = new Set(["rabbit", "fox", "fennec", "red-panda", "raccoon", "seal", "otter", "ferret"]);
+    const MARKING_KINDS = new Set(["red-panda", "raccoon", "panda", "deer", "hedgehog", "axolotl", "cockatiel"]);
+    const HORN_KINDS = new Set(["deer"]);
+    const NO_WHISKER_KINDS = new Set(["duck", "cockatiel", "seal", "frog", "axolotl", "turtle"]);
+    const BEAK_KINDS = new Set(["duck", "cockatiel"]);
     let clipCounter = 0;
 
     function uid(prefix) {
@@ -111,17 +118,61 @@
     }
 
     function mergeAppearance(a, b) {
+        const patternA = (a && a.pattern) || "solid";
+        const patternB = (b && b.pattern) || "solid";
         return {
             primary: blendHex(a && a.primary, b && b.primary, 0.35),
             secondary: blendHex(a && a.secondary, b && b.secondary, 0.65),
             accent: blendHex(a && a.accent, b && b.accent, 0.5),
             eyeColor: blendHex(a && a.eyeColor, b && b.eyeColor, 0.5),
             noseColor: blendHex(a && a.noseColor, b && b.noseColor, 0.5),
-            pattern: (a && a.pattern) || (b && b.pattern) || "solid",
-            fluff: (b && b.fluff) || (a && a.fluff) || "medium",
-            earStyle: (a && a.earStyle) || (b && b.earStyle) || "normal",
-            tail: (b && b.tail) || (a && a.tail) || "long"
+            pattern: mergeCatPattern(patternA, patternB),
+            fluff: mergeCatFluff(a && a.fluff, b && b.fluff),
+            earStyle: mergeCatEarStyle(a && a.earStyle, b && b.earStyle),
+            tail: mergeCatTail(a && a.tail, b && b.tail),
+            calicoColors: patternA === "calico" || patternB === "calico"
+                ? [
+                    blendHex(a && a.primary, b && b.accent, 0.3),
+                    blendHex(a && a.accent, b && b.primary, 0.65)
+                ]
+                : undefined
         };
+    }
+
+    function mergeCatPattern(patternA, patternB) {
+        const unique = Array.from(new Set([patternA || "solid", patternB || "solid"]));
+        if (unique.length === 1) return unique[0];
+        if (unique.includes("calico")) return "calico";
+        if (unique.includes("tortie") && unique.includes("stripes")) return "spots";
+        if (unique.includes("spots") || (unique.includes("stripes") && unique.includes("points"))) return "spots";
+        if (unique.includes("points")) return "points";
+        if (unique.includes("tuxedo")) return "tuxedo";
+        if (unique.includes("tortie")) return "tortie";
+        if (unique.includes("stripes")) return "stripes";
+        return unique.find(pattern => pattern !== "solid") || unique[0];
+    }
+
+    function mergeCatFluff(fluffA, fluffB) {
+        const unique = Array.from(new Set([fluffA || "medium", fluffB || "medium"]));
+        if (unique.length === 1) return unique[0];
+        if (unique.includes("long")) return "long";
+        if (unique.includes("hairless")) return "short";
+        if (unique.includes("medium")) return "medium";
+        return "short";
+    }
+
+    function mergeCatEarStyle(earA, earB) {
+        const options = [earA || "normal", earB || "normal"];
+        return options.sort((left, right) => CAT_EAR_PRIORITY.indexOf(right) - CAT_EAR_PRIORITY.indexOf(left))[0] || "normal";
+    }
+
+    function mergeCatTail(tailA, tailB) {
+        const left = tailA || "long";
+        const right = tailB || "long";
+        if (left === right) return left;
+        if (left === "none" && right === "none") return "none";
+        if (left === "long" || right === "long") return "long";
+        return "short";
     }
 
     function brightenAppearance(appearance) {
@@ -159,7 +210,7 @@
                 treat: mergePhrases(left.phrases && left.phrases.treat, right.phrases && right.phrases.treat, "Two snack opinions, one happy tummy."),
                 chat: mergePhrases(left.phrases && left.phrases.chat, right.phrases && right.phrases.chat, "This hybrid has stories from both sides of the cat tree.")
             },
-            funFact: `This hybrid blends ${left.breed} charm with ${right.breed} chaos in one gloriously stitched-together floof.`,
+            funFact: `This hybrid remixes ${left.breed} charm with ${right.breed} chaos into one gloriously over-designed floof.`,
             backstory: `${defaultName} appeared when ${left.defaultName} and ${right.defaultName} shared one especially imaginative afternoon.`
         };
     }
@@ -172,10 +223,21 @@
         const sparkle = !!opts.sparkle;
         const sameType = left && right && left.id === right.id;
         if (!left || !right || (sameType && !sparkle)) return null;
+        const leftKind = left.appearance && left.appearance.kind;
+        const rightKind = right.appearance && right.appearance.kind;
         const baseAppearance = sameType
             ? Object.assign({}, left.appearance)
             : {
-                kind: (left.appearance && left.appearance.kind) || "rabbit",
+                kind: chooseAnimalBodyKind(leftKind, rightKind),
+                bodyKind: chooseAnimalBodyKind(leftKind, rightKind),
+                headKind: chooseAnimalHeadKind(leftKind, rightKind),
+                earKind: chooseFeatureKind([leftKind, rightKind], DISTINCTIVE_EAR_KINDS, chooseAnimalHeadKind(leftKind, rightKind)),
+                tailKind: chooseFeatureKind([rightKind, leftKind], DISTINCTIVE_TAIL_KINDS, chooseAnimalBodyKind(leftKind, rightKind)),
+                markingKinds: Array.from(new Set([leftKind, rightKind].filter(kind => MARKING_KINDS.has(kind)))),
+                hornKinds: Array.from(new Set([leftKind, rightKind].filter(kind => HORN_KINDS.has(kind)))),
+                whiskerKind: chooseAnimalWhiskerKind(leftKind, rightKind),
+                noseKind: chooseAnimalNoseKind(leftKind, rightKind),
+                mouthKind: chooseAnimalMouthKind(leftKind, rightKind),
                 primary: blendHex(left.appearance && left.appearance.primary, right.appearance && right.appearance.primary, 0.4),
                 secondary: blendHex(left.appearance && left.appearance.secondary, right.appearance && right.appearance.secondary, 0.6),
                 accent: blendHex(left.appearance && left.appearance.accent, right.appearance && right.appearance.accent, 0.5),
@@ -210,14 +272,46 @@
             funFact: sparkle
                 ? (sameType
                     ? `${left.species} plus a Sparkle Potion becomes a bright-glow version that lights up every room.`
-                    : `This sparkle hybrid looks like ${left.species} and ${right.species} fell into a jar of stardust and loved the result.`)
-                : `This hybrid looks like ${left.species} and ${right.species} held a very silly design meeting and kept every idea.`,
+                    : `This sparkle hybrid looks like ${left.species} and ${right.species} held a starlit design jam and kept every weirdly brilliant idea.`)
+                : `This hybrid borrows the best bits of ${left.species} and ${right.species} to make one delightfully overcommitted creature.`,
             backstory: sparkle
                 ? (sameType
                     ? `${defaultName} bubbled into being when ${left.defaultName} met a Sparkle Potion and refused to stop glowing.`
                     : `${defaultName} scampered out of a starlit mash-up where ${left.defaultName} and ${right.defaultName} got a magical glow-up together.`)
                 : `${defaultName} scampered out of a daydream where ${left.defaultName} and ${right.defaultName} somehow became one unforgettable bestie.`
         };
+    }
+
+    function chooseAnimalBodyKind(kindA, kindB) {
+        return chooseFeatureKind([kindA, kindB], DISTINCTIVE_TAIL_KINDS, kindA || kindB || "rabbit");
+    }
+
+    function chooseAnimalHeadKind(kindA, kindB) {
+        return chooseFeatureKind([kindB, kindA], DISTINCTIVE_EAR_KINDS, kindB || kindA || "rabbit");
+    }
+
+    function chooseFeatureKind(candidates, featureSet, fallback) {
+        const valid = (candidates || []).filter(Boolean);
+        const found = valid.find(kind => featureSet.has(kind));
+        return found || valid[0] || fallback || "rabbit";
+    }
+
+    function chooseAnimalWhiskerKind(kindA, kindB) {
+        const valid = [kindA, kindB].filter(Boolean);
+        return valid.find(kind => !NO_WHISKER_KINDS.has(kind)) || valid[0] || "rabbit";
+    }
+
+    function chooseAnimalNoseKind(kindA, kindB) {
+        const headKind = chooseAnimalHeadKind(kindA, kindB);
+        if (BEAK_KINDS.has(headKind)) {
+            return chooseAnimalWhiskerKind(kindA, kindB);
+        }
+        return headKind;
+    }
+
+    function chooseAnimalMouthKind(kindA, kindB) {
+        const valid = [chooseAnimalHeadKind(kindA, kindB), kindA, kindB].filter(Boolean);
+        return valid.find(kind => BEAK_KINDS.has(kind)) || valid[0] || "rabbit";
     }
 
     function sparkleDecor(seamX, seamBottom, accent) {
@@ -240,41 +334,18 @@
         };
     }
 
-    function splitComposite(leftSvg, rightSvg, viewBox, seamX, seamBottom, opts) {
+    function decorateSvg(svg, viewBox, opts) {
         opts = opts || {};
-        const leftClip = uid("hybrid-left");
-        const rightClip = uid("hybrid-right");
-        const sparkle = opts.sparkle ? sparkleDecor(seamX, seamBottom, opts.accent) : { defs: "", backdrop: "", front: "" };
-        return `
-<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" class="cat-svg hybrid-svg" aria-hidden="true">
-    <defs>
-        ${sparkle.defs}
-        <clipPath id="${leftClip}">
-            <rect x="0" y="0" width="${seamX}" height="${seamBottom}"></rect>
-        </clipPath>
-        <clipPath id="${rightClip}">
-            <rect x="${seamX}" y="0" width="${seamX}" height="${seamBottom}"></rect>
-        </clipPath>
-    </defs>
-    ${sparkle.backdrop}
-    <g clip-path="url(#${leftClip})">${leftSvg}</g>
-    <g clip-path="url(#${rightClip})">${rightSvg}</g>
-    <path d="M ${seamX} 12 C ${seamX - 6} 44 ${seamX + 6} 78 ${seamX} 112 C ${seamX - 6} 150 ${seamX + 6} 182 ${seamX} ${seamBottom - 12}" stroke="#fff8f1" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.95"></path>
-    <path d="M ${seamX} 12 C ${seamX - 6} 44 ${seamX + 6} 78 ${seamX} 112 C ${seamX - 6} 150 ${seamX + 6} 182 ${seamX} ${seamBottom - 12}" stroke="#64412f" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-dasharray="5 7"></path>
-    ${sparkle.front}
-</svg>`.trim();
-    }
-
-    function singleComposite(innerSvg, viewBox, seamX, seamBottom, opts) {
-        opts = opts || {};
-        const sparkle = opts.sparkle ? sparkleDecor(seamX, seamBottom, opts.accent) : { defs: "", backdrop: "", front: "" };
-        return `
-<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" class="cat-svg hybrid-svg" aria-hidden="true">
-    <defs>${sparkle.defs}</defs>
-    ${sparkle.backdrop}
-    ${innerSvg}
-    ${sparkle.front}
-</svg>`.trim();
+        if (!svg) return "";
+        const centerX = opts.centerX == null ? Math.round((opts.width || 200) / 2) : opts.centerX;
+        const baseY = opts.baseY == null ? (opts.height || 200) : opts.baseY;
+        const sparkle = opts.sparkle ? sparkleDecor(centerX, baseY, opts.accent) : { defs: "", backdrop: "", front: "" };
+        const extraBack = opts.backdrop || "";
+        const extraFront = opts.front || "";
+        return String(svg)
+            .replace(/<svg\b([^>]*)>/, `<svg$1><defs>${sparkle.defs}</defs>${sparkle.backdrop}${extraBack}`)
+            .replace(/<\/svg>\s*$/, `${extraFront}${sparkle.front}</svg>`)
+            .replace(/class="([^"]*)"/, 'class="$1 hybrid-svg"');
     }
 
     function renderCatHybrid(spec, expression) {
@@ -283,12 +354,15 @@
         const left = window.Clan && window.Clan.findBreed(hybrid.parentIds[0]);
         const right = window.Clan && window.Clan.findBreed(hybrid.parentIds[1]);
         if (!left || !right) return "";
-        return splitComposite(
-            window.Cats.breedSvg(left.appearance, expression || "wave"),
-            window.Cats.breedSvg(right.appearance, expression || "wave"),
+        return decorateSvg(
+            window.Cats.breedSvg(hybrid.appearance, expression || "wave"),
             "0 0 200 200",
-            100,
-            200
+            {
+                width: 200,
+                height: 200,
+                backdrop: catHybridBackdrop(left, right),
+                front: catHybridFront(left, right)
+            }
         );
     }
 
@@ -298,25 +372,42 @@
         const left = window.Animals && window.Animals.findPet(hybrid.parentIds[0]);
         const right = window.Animals && window.Animals.findPet(hybrid.parentIds[1]);
         if (!left || !right) return "";
-        const leftPet = hybrid.sparkle ? Object.assign({}, left, { appearance: brightenAppearance(left.appearance) }) : left;
-        const rightPet = hybrid.sparkle ? Object.assign({}, right, { appearance: brightenAppearance(right.appearance) }) : right;
-        if (!hybrid.hybrid) {
-            return singleComposite(
-                window.Animals.petSvg(leftPet, expression || "happy"),
-                "0 0 240 280",
-                120,
-                280,
-                { sparkle: hybrid.sparkle, accent: hybrid.appearance && hybrid.appearance.accent }
-            );
-        }
-        return splitComposite(
-            window.Animals.petSvg(leftPet, expression || "happy"),
-            window.Animals.petSvg(rightPet, expression || "happy"),
+        const pet = { appearance: hybrid.appearance };
+        return decorateSvg(
+            window.Animals.petSvg(pet, expression || "happy"),
             "0 0 240 280",
-            120,
-            280,
-            { sparkle: hybrid.sparkle, accent: hybrid.appearance && hybrid.appearance.accent }
+            {
+                width: 240,
+                height: 280,
+                sparkle: hybrid.sparkle,
+                accent: hybrid.appearance && hybrid.appearance.accent,
+                backdrop: hybrid.hybrid ? animalHybridBackdrop(left, right) : "",
+                front: hybrid.hybrid ? animalHybridFront(left, right) : ""
+            }
         );
+    }
+
+    function catHybridBackdrop(left, right) {
+        return `
+    <ellipse cx="72" cy="134" rx="22" ry="12" fill="${blendHex(left.appearance && left.appearance.secondary, right.appearance && right.appearance.secondary, 0.35)}" opacity="0.38"></ellipse>
+    <ellipse cx="132" cy="118" rx="18" ry="11" fill="${blendHex(left.appearance && left.appearance.accent, right.appearance && right.appearance.secondary, 0.55)}" opacity="0.28"></ellipse>`;
+    }
+
+    function catHybridFront(left, right) {
+        return `
+    <path d="M 62 92 q 16 -18 34 -8 q -6 18 -24 24 q -16 -2 -10 -16 z" fill="${blendHex(left.appearance && left.appearance.primary, right.appearance && right.appearance.accent, 0.45)}" opacity="0.46"></path>
+    <path d="M 116 128 q 24 -12 30 10 q -10 14 -28 10 q -10 -8 -2 -20 z" fill="${blendHex(left.appearance && left.appearance.accent, right.appearance && right.appearance.primary, 0.5)}" opacity="0.4"></path>`;
+    }
+
+    function animalHybridBackdrop(left, right) {
+        return `
+    <ellipse cx="120" cy="218" rx="60" ry="32" fill="${blendHex(left.appearance && left.appearance.secondary, right.appearance && right.appearance.secondary, 0.5)}" opacity="0.18"></ellipse>`;
+    }
+
+    function animalHybridFront(left, right) {
+        return `
+    <path d="M 74 180 q 24 -18 52 -8 q -10 18 -34 24 q -24 0 -18 -16 z" fill="${blendHex(left.appearance && left.appearance.accent, right.appearance && right.appearance.primary, 0.42)}" opacity="0.32"></path>
+    <path d="M 132 198 q 26 -12 40 10 q -12 16 -34 14 q -12 -8 -6 -24 z" fill="${blendHex(left.appearance && left.appearance.primary, right.appearance && right.appearance.accent, 0.58)}" opacity="0.26"></path>`;
     }
 
     function reactionPhrase(spec, kind) {

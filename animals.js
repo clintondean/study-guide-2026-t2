@@ -409,25 +409,39 @@
             eyeColor: "#2f5037"
         }, (pet && pet.appearance) || {});
         const kind = a.kind || "rabbit";
+        const bodyKind = a.bodyKind || kind;
+        const headKind = a.headKind || kind;
+        const earKind = a.earKind || headKind;
+        const tailKind = a.tailKind || bodyKind;
+        const markingKinds = uniqueKinds(a.markingKinds, a.markingKind || bodyKind);
+        const hornKinds = uniqueKinds(a.hornKinds, a.hornKind || headKind);
+        const whiskerKind = a.whiskerKind || headKind;
+        const noseKind = a.noseKind || headKind;
+        const mouthKind = a.mouthKind || noseKind;
         const compact = !!opts.compact;
-        const faceY = kind === "alpaca" ? 142 : 144;
-        const isBeak = kind === "duck" || kind === "cockatiel";
+        const faceY = headKind === "alpaca" ? 142 : 144;
+        const isBeak = mouthKind === "duck" || mouthKind === "cockatiel";
         const viewBox = compact ? "0 0 240 280" : "0 0 240 280";
         return `
             <svg viewBox="${viewBox}" class="cat-svg animal-svg animal-${kind}" role="img" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                ${tailFor(kind, a)}
-                ${bodyFor(kind, a)}
-                ${earsFor(kind, a)}
-                ${hornsFor(kind, a)}
-                ${headFor(kind, a)}
-                ${markingsFor(kind, a)}
+                ${tailFor(tailKind, a)}
+                ${bodyFor(bodyKind, a)}
+                ${earsFor(earKind, a)}
+                ${hornKinds.map(kindId => hornsFor(kindId, a)).join("")}
+                ${headFor(headKind, a)}
+                ${markingKinds.map(kindId => markingsFor(kindId, a)).join("")}
                 ${eyesFor(expression, a.eyeColor, 120, faceY, compact)}
-                ${noseFor(kind, a)}
-                ${whiskersFor(kind, 120, faceY + 6)}
+                ${noseFor(noseKind, a)}
+                ${whiskersFor(whiskerKind, 120, faceY + 6)}
                 ${mouthFor(expression, 120, faceY + 6, isBeak)}
                 ${blushFor(expression, 120, faceY + 2)}
             </svg>
         `;
+    }
+
+    function uniqueKinds(list, fallback) {
+        const items = Array.isArray(list) ? list.slice() : [fallback];
+        return Array.from(new Set(items.filter(Boolean)));
     }
 
     const PETS = [

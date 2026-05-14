@@ -5115,3 +5115,196 @@ window.SUBJECT_DATA["music-7"] = {
         }
     ]
 };
+
+const MUSIC7_LEARNING_GUIDES = [
+    {
+        id: "music7-guide-pitch-scales",
+        topicId: "pitch-scales",
+        title: "Pitch, contour, tones and semitones",
+        intro: "Pitch questions ask students to recognise whether notes move higher or lower and to use basic scale vocabulary correctly.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Pitch describes how high or low a sound is.",
+                    "Contour is the shape of a melody as it moves through pitches.",
+                    "A semitone is the smallest step commonly used in Western music, and a tone is two semitones."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Identify whether the melody is moving up, down or staying mostly the same.",
+                    "If the question is about a scale, recall the major scale pattern carefully before answering.",
+                    "Use the correct word, such as ascending, descending, static, tone or semitone, in your explanation."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Pitch is not the same as dynamics because pitch is about high and low, not loud and soft.",
+                    "Contour describes shape, not tempo.",
+                    "A tone is bigger than a semitone, not the other way around."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I described the pitch movement accurately?",
+            "Did I use tone and semitone correctly?"
+        ]
+    },
+    {
+        id: "music7-guide-duration-rhythm",
+        topicId: "duration-rhythm",
+        title: "Duration, rhythm and time signatures",
+        intro: "This topic focuses on how long sounds last, how beats are grouped and how rhythmic patterns are described in listening questions.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Duration is about how long sounds and silences last.",
+                    "Rhythm is the pattern of long and short sounds.",
+                    "A time signature shows how beats are grouped in each bar."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Look at the numbers in the time signature and decide how many beats fit in each bar.",
+                    "If the question is about rhythm, focus on note lengths, accents and pulse groupings.",
+                    "Use the correct beat value when you explain what the time signature means."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Rhythm is not the same as tempo because rhythm is the pattern while tempo is the speed.",
+                    "The top number in a time signature does not tell you the note name by itself.",
+                    "A march feel is usually connected to a strong duple pulse."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I explained the beat grouping correctly?",
+            "Did I describe the rhythmic pattern rather than the speed?"
+        ]
+    },
+    {
+        id: "music7-guide-structure-form",
+        topicId: "structure-form",
+        title: "Binary, ternary and verse-chorus form",
+        intro: "Form questions are about how musical sections are organised and how a listener can recognise recurring or contrasting material.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Binary form is AB.",
+                    "Ternary form is ABA.",
+                    "Verse-chorus form alternates changing verses with a repeated chorus."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Listen or read for section order first, then name the form.",
+                    "If the question asks how a listener could identify the form, explain what repeats and what changes.",
+                    "Compare the sections directly using words such as return, contrast and repeat."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "AB is binary, not ternary, because the first section does not return.",
+                    "A repeating chorus does not automatically mean ternary form.",
+                    "Form describes section order, not just style or mood."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I named the section pattern correctly?",
+            "Did I explain what a listener would hear that proves the form?"
+        ]
+    },
+    {
+        id: "music7-guide-dynamics-tempo",
+        topicId: "dynamics-tempo",
+        title: "Dynamics, tempo and expressive change",
+        intro: "These questions test whether students can describe loudness, speed and the way musical changes affect the character of a piece.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Dynamics describe loudness, using terms such as pp, p, mf, f and ff.",
+                    "Tempo describes speed, using terms such as Largo, Andante, Allegro and Presto.",
+                    "Changes such as crescendo or getting faster change the mood and energy of the music."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Identify whether the question is asking about loudness, speed or both.",
+                    "Use correct Italian terms or dynamic markings in your answer wherever possible.",
+                    "If the music changes, explain both the change itself and the effect it has on the listener."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Tempo is not the same as rhythm because tempo is speed.",
+                    "Dynamics are not the same as pitch because dynamics are about loudness.",
+                    "A gradual change should be described as a process, not as one fixed level."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I used the correct dynamic or tempo term?",
+            "Did I explain how the change affects the music's character?"
+        ]
+    }
+];
+
+const MUSIC7_SUPPORT_HINTS = {
+    "pitch-scales": {
+        mcq: "Think about whether the question is testing high and low pitch, melodic shape or scale-step vocabulary.",
+        short: "Name the pitch idea first, then describe what the listener would hear.",
+        long: "Build your answer around the key pitch terms and use them to explain the example clearly."
+    },
+    "duration-rhythm": {
+        mcq: "Focus on beat groupings, note lengths and what the time signature actually tells you.",
+        short: "State the rhythm or time-signature rule first, then apply it to the musical example.",
+        long: "Structure your answer around pulse, beat grouping and rhythmic pattern so each idea is clear."
+    },
+    "structure-form": {
+        mcq: "Look for the order of sections and whether the opening material returns.",
+        short: "Name the form first, then explain what repeats and what contrasts.",
+        long: "Compare the sections directly so the listener can see why the form fits."
+    },
+    "dynamics-tempo": {
+        mcq: "Decide whether the clue is about loudness, speed or a change in one of those features.",
+        short: "Use the correct dynamic or tempo term and then explain the musical effect.",
+        long: "Explain the expressive change step by step using accurate Italian terms or markings."
+    }
+};
+
+function music7SupportHintFor(question) {
+    const hints = MUSIC7_SUPPORT_HINTS[question.topic];
+    if (!hints) return "Use the main music concept in this topic to explain what the listener would hear.";
+    if (question.options) return hints.mcq;
+    if ((question.marks || 0) >= 8) return hints.long;
+    return hints.short;
+}
+
+function applyMusic7Support(subject) {
+    const allQuestions = [].concat(subject.mcqs || [], subject.short || [], subject.long || []);
+    subject.learningGuides = MUSIC7_LEARNING_GUIDES.map(function (guide) {
+        return Object.assign({}, guide);
+    });
+    allQuestions.forEach(function (question) {
+        question.support = {
+            hint: music7SupportHintFor(question),
+            guideId: `music7-guide-${question.topic}`
+        };
+    });
+}
+
+applyMusic7Support(window.SUBJECT_DATA["music-7"]);

@@ -892,6 +892,7 @@
         }
         if (route[0] === "subject" && route[1]) {
             const subjectId = route[1];
+            if (route[2] === "guide" && route[3]) return renderLearningGuide(root, subjectId, route[3]);
             if (route[2] === "quiz" && route[3]) return renderQuiz(root, subjectId, route[3], route[4] || null);
             return renderSubject(root, subjectId);
         }
@@ -1637,6 +1638,141 @@
     // Per-position key used for session.answers (so duplicate q.id's stay separate)
     function keyOf(q) { return q._sessionKey || q.id; }
 
+    function currentAnswerSnapshot(q) {
+        return session ? session.answers[keyOf(q)] : null;
+    }
+
+    function ensureAnswerSnapshot(q) {
+        const k = keyOf(q);
+        if (!session.answers[k]) session.answers[k] = { correct: false };
+        return session.answers[k];
+    }
+
+    function hasMeaningfulAnswer(ans) {
+        if (!ans) return false;
+        if (ans.user != null) return true;
+        if (typeof ans.userText === "string" && ans.userText.trim()) return true;
+        return !!ans.correct;
+    }
+
+    function learningGuideById(subjectId, guideId) {
+        const subj = window.SUBJECT_DATA[subjectId];
+        if (!subj || !Array.isArray(subj.learningGuides)) return null;
+        return subj.learningGuides.find(guide => guide.id === guideId) || null;
+    }
+
+    function questionAssistFor(q, subjectId) {
+        const subj = window.SUBJECT_DATA[subjectId || (session && session.subjectId)];
+        if (!subj || !Array.isArray(subj.learningGuides) || !q || !q.support) return null;
+        if (!q.support.hint || !q.support.guideId) return null;
+        if (!learningGuideById(subj.id, q.support.guideId)) return null;
+        return q.support;
+    }
+
+    function questionAssistHintShown(q) {
+        const ans = currentAnswerSnapshot(q);
+        return !!(ans && ans.hintShown);
+    }
+
+    function shouldGateSampleBehindHint(q) {
+        return !session.isMock && questionType(q, window.SUBJECT_DATA[session.subjectId]) !== "mcq" && !!questionAssistFor(q, session.subjectId);
+    }
+
+    function renderQuestionAssistBlock(q) {
+        const assist = questionAssistFor(q, session.subjectId);
+        if (!assist) return "";
+        return `
+            <div class="question-assist">
+                <button type="button" class="help-btn hint-btn" id="question-hint-btn">💡 Hint</button>
+                <a class="help-btn question-assist-link" id="question-guide-link" href="#/subject/${session.subjectId}/guide/${assist.guideId}">📘 Learn about this question</a>
+                <div class="hint-panel question-assist-panel" id="question-hint-panel" hidden></div>
+            </div>
+        `;
+    }
+
+    function wireQuestionAssist(q) {
+        const hintBtn = $("#question-hint-btn");
+        if (hintBtn) hintBtn.addEventListener("click", () => revealQuestionAssistHint(q, false));
+    }
+
+    function revealQuestionAssistHint(q, silent) {
+        const assist = questionAssistFor(q, session.subjectId);
+        if (!assist) return;
+        const panel = $("#question-hint-panel");
+        if (panel) {
+            panel.innerHTML = `<p class="help-rule"><strong>Hint:</strong> ${renderText(assist.hint)}</p>`;
+            if (shouldGateSampleBehindHint(q)) {
+                panel.innerHTML += `<p class="help-tip">Sample answer unlocked below.</p>`;
+            }
+            panel.hidden = false;
+        }
+        const hintBtn = $("#question-hint-btn");
+        if (hintBtn) {
+            hintBtn.disabled = true;
+            hintBtn.textContent = "💡 Hint shown";
+        }
+        const ans = ensureAnswerSnapshot(q);
+        ans.hintShown = true;
+        persistAnswerForExam(q, ans);
+        if (shouldGateSampleBehindHint(q)) {
+            renderAnswerArea(q, ans, !!ans.locked);
+        }
+    }
+
+    function renderLearningGuide(root, subjectId, guideId) {
+        if (!isSelectedLiveSubject(subjectId)) { navigate("/"); return; }
+        const subj = window.SUBJECT_DATA[subjectId];
+        if (!subj) { navigate("/"); return; }
+        const guide = learningGuideById(subjectId, guideId);
+        if (!guide) { navigate(`/subject/${subjectId}`); return; }
+        const topic = subj.topics.find(t => t.id === guide.topicId);
+        const sections = (guide.sections || []).map(section => `
+            <section class="guide-section">
+                <h3>${escapeHtml(section.heading || "")}</h3>
+                ${section.body ? `<p>${renderText(section.body)}</p>` : ""}
+                ${Array.isArray(section.points) && section.points.length ? `<ul>${section.points.map(point => `<li>${renderText(point)}</li>`).join("")}</ul>` : ""}
+            </section>
+        `).join("");
+        const quickChecks = Array.isArray(guide.quickChecks) && guide.quickChecks.length
+            ? `
+                <section class="guide-section guide-quick-checks">
+                    <h3>Quick checks</h3>
+                    <ul>${guide.quickChecks.map(item => `<li>${renderText(item)}</li>`).join("")}</ul>
+                </section>
+            `
+            : "";
+        const showReturnButton = !!(session && session.subjectId === subjectId);
+
+        root.innerHTML = `
+            <a class="back-link" href="#/subject/${subjectId}">← Back to ${escapeHtml(subj.name)}</a>
+            <section class="guide-page" style="--accent:${subj.color}">
+                <header class="guide-header">
+                    <div>
+                        <p class="overline">${escapeHtml(subj.tagline)}</p>
+                        <h1>${subj.icon} ${escapeHtml(guide.title)}</h1>
+                        <p class="guide-summary">${renderText(guide.intro || "")}</p>
+                    </div>
+                    <div class="guide-topic-chip">${topic ? escapeHtml(topic.name) : "Learning guide"}</div>
+                </header>
+                ${showReturnButton ? `
+                    <div class="guide-return-row">
+                        <button type="button" class="ghost-btn" id="guide-return-btn">↩ Return to your question</button>
+                        <p class="guide-return-note">Use browser back to jump straight into your practice question again.</p>
+                    </div>
+                ` : ""}
+                <div class="guide-body">
+                    ${sections}
+                    ${quickChecks}
+                </div>
+            </section>
+        `;
+
+        const returnBtn = $("#guide-return-btn");
+        if (returnBtn) {
+            returnBtn.addEventListener("click", () => window.history.back());
+        }
+    }
+
     function renderCurrentQuestion(root) {
         const subj = window.SUBJECT_DATA[session.subjectId];
         const q = session.questions[session.index];
@@ -1647,6 +1783,7 @@
         const previous = session.answers[keyOf(q)];
         const isLocked = !!(previous && previous.locked);
         const isLastQuestion = session.index === total - 1;
+        const hasQuestionAssist = !!(!session.isMock && questionAssistFor(q, session.subjectId));
 
         root.innerHTML = `
             <a class="back-link" href="#/subject/${session.subjectId}">← Back${session.isLockMode ? " (exits attempt)" : ""}</a>
@@ -1677,7 +1814,7 @@
                     ${q.marks && !session.isMock ? `<div class="marks">[${q.marks} mark${q.marks === 1 ? "" : "s"}]</div>` : ""}
                     ${isLocked ? `<div class="locked-indicator">🔒 Answer locked — review only</div>` : ""}
                     <div class="answer-area" id="answer-area"></div>
-                    ${q.help && !session.isMock ? renderHintHelpBlock(q) : ""}
+                    ${hasQuestionAssist ? renderQuestionAssistBlock(q) : (q.help && !session.isMock ? renderHintHelpBlock(q) : "")}
                     <div class="feedback" id="feedback" aria-live="polite"></div>
                     <div class="quiz-controls">
                         <button type="button" class="ghost-btn" id="prev-btn" ${session.index === 0 ? "disabled" : ""}>← Prev</button>
@@ -1692,7 +1829,10 @@
 
         if (session.isMock) renderMockTimerChip();
 
-        if (q.help && !session.isMock) {
+        if (hasQuestionAssist) {
+            wireQuestionAssist(q);
+            if (questionAssistHintShown(q)) revealQuestionAssistHint(q, true);
+        } else if (q.help && !session.isMock) {
             wireHintHelp(q);
             // If this question already has a session-stored reveal, show it
             const helpState = (session.helpStates && session.helpStates[keyOf(q)]) || {};
@@ -1746,7 +1886,9 @@
             }
         } else {
             const value = previous && previous.userText ? previous.userText : "";
-            const showSample = previous && previous.revealed;
+            const sampleGated = shouldGateSampleBehindHint(q);
+            const sampleUnlocked = !sampleGated || !!(previous && previous.hintShown);
+            const showSample = sampleUnlocked && !!(previous && previous.revealed);
             const ro = isLocked ? "readonly" : "";
             const aiKey = (state.settings && state.settings.geminiApiKey) || "";
             const ai = previous && previous.aiFeedback;
@@ -1760,10 +1902,11 @@
                 <textarea id="written-answer" rows="${type === "long" ? 12 : 6}" ${ro} placeholder="${session.isMock ? "Type your response. Once you press Next it will be locked." : "Plan and write your response here. (Saved automatically.)"}">${escapeHtml(value)}</textarea>
                 ${session.isMock ? `` : `
                     <div class="written-actions">
-                        <button type="button" class="ghost-btn" id="reveal-sample">${showSample ? "Hide" : "Show"} sample answer</button>
+                        ${sampleUnlocked ? `<button type="button" class="ghost-btn" id="reveal-sample">${showSample ? "Hide" : "Show"} sample answer</button>` : ""}
                         <button type="button" class="ghost-btn" id="self-correct">${previous && previous.correct ? "Marked correct ✓" : "I got this right"}</button>
                         <button type="button" class="ai-btn ${aiKey ? "" : "ai-btn-needs-key"}" id="ai-mark-btn">${aiBtnLabel}</button>
                     </div>
+                    ${sampleUnlocked ? "" : `<p class="sample-lock-note">💡 Click Hint to unlock the sample answer for this question.</p>`}
                     ${ai ? renderAIFeedback(ai, q.marks) : ""}
                     <div class="sample" id="sample-block" ${showSample ? "" : "hidden"}>
                         <h4>Sample / marker's notes</h4>
@@ -1785,11 +1928,11 @@
             if (ta && !isLocked) {
                 let saveTimer = null;
                 ta.addEventListener("input", e => {
-                    if (!session.answers[k]) session.answers[k] = { userText: "", correct: false };
-                    session.answers[k].userText = e.target.value;
+                    const ans = ensureAnswerSnapshot(q);
+                    ans.userText = e.target.value;
                     // Debounce persistence so we don't write to localStorage on every keystroke.
                     if (saveTimer) clearTimeout(saveTimer);
-                    saveTimer = setTimeout(() => persistAnswerForExam(q, session.answers[k]), 700);
+                    saveTimer = setTimeout(() => persistAnswerForExam(q, ans), 700);
                 });
                 ta.addEventListener("blur", () => {
                     if (session.answers[k]) persistAnswerForExam(q, session.answers[k]);
@@ -1798,22 +1941,23 @@
             const revealBtn = $("#reveal-sample");
             if (revealBtn) {
                 revealBtn.addEventListener("click", () => {
-                    if (!session.answers[k]) session.answers[k] = { userText: "", correct: false };
-                    session.answers[k].revealed = !session.answers[k].revealed;
-                    persistAnswerForExam(q, session.answers[k]);
-                    renderAnswerArea(q, session.answers[k], isLocked);
+                    const ans = ensureAnswerSnapshot(q);
+                    ans.revealed = !ans.revealed;
+                    persistAnswerForExam(q, ans);
+                    renderAnswerArea(q, ans, isLocked);
                 });
             }
             const selfBtn = $("#self-correct");
             if (selfBtn) {
                 selfBtn.addEventListener("click", () => {
-                    if (!session.answers[k]) session.answers[k] = { userText: ($("#written-answer") || {}).value || "", correct: false };
-                    session.answers[k].correct = !session.answers[k].correct;
-                    if (session.answers[k].correct) {
+                    const ans = ensureAnswerSnapshot(q);
+                    if (!ans.userText) ans.userText = ($("#written-answer") || {}).value || "";
+                    ans.correct = !ans.correct;
+                    if (ans.correct) {
                         mascotPopIn({ expression: "cheering", message: pickPhrase("correct") });
                     }
-                    persistAnswerForExam(q, session.answers[k]);
-                    renderAnswerArea(q, session.answers[k], isLocked);
+                    persistAnswerForExam(q, ans);
+                    renderAnswerArea(q, ans, isLocked);
                 });
             }
             // 🤖 AI feedback button (practice exams only, when API key set)
@@ -1874,7 +2018,7 @@
             fb.innerHTML = "";
         }
 
-        session.answers[k] = { user: idx, correct, locked: nowLocked };
+        session.answers[k] = Object.assign({}, session.answers[k] || {}, { user: idx, correct, locked: nowLocked });
 
         // Wrong-answer reveal: if the player just locked in a wrong answer on a
         // Maths-style question with help data, show the full solution panel.
@@ -2008,10 +2152,10 @@
         const subjState = state.subjects[session.subjectId];
         const k = keyOf(q);
         const ans = session.answers[k];
-        if (!ans) {
+        if (!ans || !hasMeaningfulAnswer(ans)) {
             // In any lock-mode (practice OR mock), an unanswered question gets locked on Next.
             if (session.isLockMode) {
-                session.answers[k] = { locked: true, correct: false };
+                session.answers[k] = Object.assign({}, ans || {}, { locked: true, correct: false });
                 persistAnswerForExam(q, session.answers[k]);
             }
             return;

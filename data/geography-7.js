@@ -6671,3 +6671,278 @@ window.SUBJECT_DATA["geography-7"] = {
         }
     ]
 };
+
+const GEOGRAPHY7_LEARNING_GUIDES = [
+    {
+        id: "geography7-guide-mapping-skills",
+        topicId: "mapping-skills",
+        title: "Reading maps with BOLTSS and geographical tools",
+        intro: "Mapping questions are usually about how map features help a reader understand information clearly, accurately and quickly.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "BOLTSS stands for Border, Orientation, Legend, Title, Scale and Source.",
+                    "Each map feature has a job, such as showing direction, explaining symbols or identifying the topic.",
+                    "Geographical tools such as symbols, aerial photographs and maps help represent places and patterns."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Name the map feature first, then explain what it helps the reader understand.",
+                    "If the question asks what could go wrong, explain how missing information makes the map less clear or less accurate.",
+                    "Use the exact language of the feature, such as legend, orientation or source, instead of a vague description."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Legend explains symbols, while title explains what the map is about.",
+                    "Orientation shows direction, not distance.",
+                    "Source tells where information came from, not what the map measures."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I named the correct BOLTSS feature?",
+            "Did I explain how it helps a geographer read the map?"
+        ]
+    },
+    {
+        id: "geography7-guide-direction-scale",
+        topicId: "direction-scale",
+        title: "Direction, bearing, scale and distance",
+        intro: "These questions test whether you can use directional language correctly and convert map measurements into real-world distance.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Bearings are measured clockwise from north and written as three-figure numbers.",
+                    "Compass directions describe position, while scale connects map distance to actual distance.",
+                    "A ruler and the scale are often used together to work out real distance."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Read the direction or scale carefully before doing any calculation.",
+                    "If a distance question is asked, convert the map measurement step by step using the scale.",
+                    "Check whether the question wants a compass direction, a bearing or a distance."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A bearing is not measured anticlockwise.",
+                    "North-east is halfway between north and east, not north-west.",
+                    "Map distance and real distance are not the same unless you use the scale."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I used clockwise from north for a bearing question?",
+            "Did I convert the map distance using the stated scale?"
+        ]
+    },
+    {
+        id: "geography7-guide-landscapes-features",
+        topicId: "landscapes-features",
+        title: "Landscapes, landforms and human features",
+        intro: "Landscape questions focus on what can be seen in an area and how natural and human elements combine to shape that place.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "A landscape includes the visible features of an area.",
+                    "Natural elements include things such as rivers, hills, soil and vegetation.",
+                    "Human elements include things such as roads, buildings, farms and tourism facilities."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Define the key term first, then give an example that matches it.",
+                    "If the question asks for a comparison, explain how natural and human elements are different but connected.",
+                    "Use a named landform or visible feature as evidence when the question asks for description."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A landscape is not only natural scenery because human features can also be part of it.",
+                    "A landform is a natural feature such as a mountain or valley, not a map tool.",
+                    "Human elements can change how a landscape looks and how it is used."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I identified whether the feature is natural or human?",
+            "Did I explain how the feature shapes the landscape?"
+        ]
+    },
+    {
+        id: "geography7-guide-geomorphic-processes",
+        topicId: "geomorphic-processes",
+        title: "Weathering, erosion and deposition",
+        intro: "Geomorphic-process questions are about how Earth's surface changes over time through the breakdown, movement and dropping of material.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Weathering breaks rock down in place.",
+                    "Erosion moves material from one place to another.",
+                    "Deposition happens when transported material is dropped."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Decide which process the question is really describing before answering.",
+                    "If more than one process is mentioned, explain them in the order they happen.",
+                    "Use an agent such as water, wind, waves or ice if the question asks how the landform changes."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Weathering does not move the rock away.",
+                    "Deposition is not the same as erosion because it is when the material is dropped.",
+                    "Different environments may be shaped by different dominant agents."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I matched the definition to the correct geomorphic process?",
+            "Did I explain how the process changes the landform over time?"
+        ]
+    },
+    {
+        id: "geography7-guide-water-resources",
+        topicId: "water-resources",
+        title: "Why water resources matter",
+        intro: "Water-resource questions ask why water is valuable, where freshwater is found and what happens when people place pressure on it.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Freshwater resources include rivers, lakes and groundwater.",
+                    "Water supports homes, farming, industry, recreation and ecosystems.",
+                    "Poor management can lead to shortages, pollution and environmental damage."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Identify the water resource first, then explain why it matters.",
+                    "If the question asks for consequences, include both human and environmental impacts.",
+                    "Use cause-and-effect language, such as overuse leading to shortages or pollution harming ecosystems."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Not all water is freshwater because oceans are saltwater.",
+                    "Groundwater is stored beneath the ground, not only in clouds or glaciers.",
+                    "Water is valuable for more than drinking alone."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I explained why the water resource is important?",
+            "Did I show what happens if it is poorly managed?"
+        ]
+    },
+    {
+        id: "geography7-guide-catchments-management",
+        topicId: "catchments-management",
+        title: "Catchments and protecting water systems",
+        intro: "Catchment questions focus on how water moves through a system and why protecting that system matters for people and environments.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "A catchment is an area where water drains to the same river, lake or other water body.",
+                    "Water can move through runoff, streams, rivers, infiltration and groundwater flow.",
+                    "Healthy catchments provide water and support plants, animals and ecosystems."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Describe the movement of water in sequence when the question asks how water travels through a catchment.",
+                    "If protection is mentioned, explain both why it matters and how people can help.",
+                    "Use terms such as runoff, infiltration and groundwater accurately."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A catchment is the whole drainage area, not just the river channel.",
+                    "Protecting vegetation and reducing pollution both help protect the catchment.",
+                    "Catchments matter for both human needs and environmental health."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I explained how water moves through the catchment?",
+            "Did I include why protection matters for both people and environments?"
+        ]
+    }
+];
+
+const GEOGRAPHY7_SUPPORT_HINTS = {
+    "mapping-skills": {
+        mcq: "Think about the job each map feature does for a reader before choosing your answer.",
+        short: "Name the map feature first, then explain how it makes the map clearer or more useful.",
+        long: "Organise your response by defining the feature or concept and then explaining why it matters in geography."
+    },
+    "direction-scale": {
+        mcq: "Focus on direction words, clockwise bearings and how scale converts map distance into real distance.",
+        short: "State the direction or scale rule first, then apply it to the example in the question.",
+        long: "Work through the skill step by step so your explanation shows both the rule and the result."
+    },
+    "landscapes-features": {
+        mcq: "Ask whether the question is about a natural feature, a human feature or the landscape as a whole.",
+        short: "Define the landscape term clearly before giving an example that matches it.",
+        long: "Compare natural and human elements directly and explain how they shape the appearance and use of a place."
+    },
+    "geomorphic-processes": {
+        mcq: "Decide whether the process breaks material down, moves it or drops it.",
+        short: "Name the geomorphic process first, then explain exactly what it does to the landform.",
+        long: "Structure your answer around weathering, erosion and deposition so the sequence is clear."
+    },
+    "water-resources": {
+        mcq: "Think about where freshwater is found and why people and ecosystems rely on it.",
+        short: "Identify the water resource first, then explain why it is valuable or under pressure.",
+        long: "Explain the importance of water with both human and environmental consequences in mind."
+    },
+    "catchments-management": {
+        mcq: "Focus on how water moves through the catchment and what keeps that system healthy.",
+        short: "Use the correct catchment term first, then explain the movement or management idea in the question.",
+        long: "Describe the path of water through the catchment and then link that to why protection matters."
+    }
+};
+
+function geography7SupportHintFor(question) {
+    const hints = GEOGRAPHY7_SUPPORT_HINTS[question.topic];
+    if (!hints) return "Use the key geography idea in this topic to explain the feature, process or management issue.";
+    if (question.options) return hints.mcq;
+    if ((question.marks || 0) >= 8) return hints.long;
+    return hints.short;
+}
+
+function applyGeography7Support(subject) {
+    const allQuestions = [].concat(subject.mcqs || [], subject.short || [], subject.long || []);
+    subject.learningGuides = GEOGRAPHY7_LEARNING_GUIDES.map(function (guide) {
+        return Object.assign({}, guide);
+    });
+    allQuestions.forEach(function (question) {
+        question.support = {
+            hint: geography7SupportHintFor(question),
+            guideId: `geography7-guide-${question.topic}`
+        };
+    });
+}
+
+applyGeography7Support(window.SUBJECT_DATA["geography-7"]);

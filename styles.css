@@ -3862,6 +3862,27 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .help-btn:hover { background: var(--good); color: white; }
 
+.question-assist-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.question-assist-link:hover {
+    text-decoration: none;
+}
+
+.question-assist-panel .help-rule {
+    margin-bottom: 0;
+}
+
+.sample-lock-note {
+    margin-top: 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+}
+
 .help-panel {
     background: var(--surface-soft);
     border: 1px solid var(--border);
@@ -3884,6 +3905,86 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
     color: var(--text);
 }
 .help-steps li { margin-bottom: 0.4rem; }
+
+.guide-page {
+    display: grid;
+    gap: 1rem;
+}
+
+.guide-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 10%, var(--surface)) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    padding: 1.2rem 1.4rem;
+}
+
+.guide-header h1 {
+    font-size: 1.7rem;
+    margin-bottom: 0.45rem;
+}
+
+.guide-summary {
+    color: var(--text-muted);
+    max-width: 60ch;
+}
+
+.guide-topic-chip {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+    border-radius: var(--radius-pill);
+    padding: 0.45rem 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.guide-return-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: center;
+}
+
+.guide-return-note {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.guide-body {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.guide-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    padding: 1rem 1.2rem;
+}
+
+.guide-section h3 {
+    font-size: 1.05rem;
+    margin-bottom: 0.45rem;
+}
+
+.guide-section p,
+.guide-section li {
+    color: var(--text);
+}
+
+.guide-section ul {
+    margin-left: 1.2rem;
+}
+
+.guide-quick-checks {
+    border-left: 4px solid var(--good);
+}
 
 /* Feedback */
 

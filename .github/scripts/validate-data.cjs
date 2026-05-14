@@ -9,6 +9,7 @@ const files = ['data/commerce.js', 'data/english.js', 'data/geography.js', 'data
 for (const f of files) eval(fs.readFileSync(path.join(root, f), 'utf8'));
 
 let problems = 0;
+const SUPPORT_SUBJECT_IDS = new Set(['science', 'geography-7', 'music-7']);
 const log = (...args) => { console.log(...args); };
 const fail = (msg) => { problems++; console.error('  ⚠ ' + msg); };
 
@@ -76,6 +77,46 @@ for (const id of Object.keys(window.SUBJECT_DATA)) {
             }
             for (const st of t.sourceTopics || []) {
                 if (!topicIds.has(st)) fail(`practice topic ${t.id} references unknown sourceTopic '${st}'`);
+            }
+        }
+    }
+
+    if (SUPPORT_SUBJECT_IDS.has(id)) {
+        if (!Array.isArray(s.learningGuides) || !s.learningGuides.length) {
+            fail(`${id} missing learningGuides`);
+        } else {
+            const guideIds = new Set();
+            for (const guide of s.learningGuides) {
+                if (!guide.id) fail(`${id} learning guide missing id`);
+                if (guideIds.has(guide.id)) fail(`${id} duplicate learning guide id '${guide.id}'`);
+                guideIds.add(guide.id);
+                if (!guide.title) fail(`${id} learning guide ${guide.id || '(missing id)'} missing title`);
+                if (!guide.topicId || !topicIds.has(guide.topicId)) fail(`${id} learning guide ${guide.id || '(missing id)'} has unknown topicId '${guide.topicId}'`);
+                if (!guide.intro || typeof guide.intro !== 'string') fail(`${id} learning guide ${guide.id || '(missing id)'} missing intro`);
+                if (!Array.isArray(guide.sections) || !guide.sections.length) {
+                    fail(`${id} learning guide ${guide.id || '(missing id)'} missing sections`);
+                } else {
+                    guide.sections.forEach((section, index) => {
+                        if (!section || typeof section !== 'object') fail(`${id} learning guide ${guide.id || '(missing id)'} section ${index} is invalid`);
+                        if (!section.heading || typeof section.heading !== 'string') fail(`${id} learning guide ${guide.id || '(missing id)'} section ${index} missing heading`);
+                        const hasBody = typeof section.body === 'string' && section.body.trim();
+                        const hasPoints = Array.isArray(section.points) && section.points.length;
+                        if (!hasBody && !hasPoints) fail(`${id} learning guide ${guide.id || '(missing id)'} section ${index} needs body or points`);
+                    });
+                }
+                if (guide.quickChecks !== undefined) {
+                    if (!Array.isArray(guide.quickChecks)) fail(`${id} learning guide ${guide.id || '(missing id)'} quickChecks must be an array`);
+                    else if (!guide.quickChecks.every(item => typeof item === 'string' && item.trim())) fail(`${id} learning guide ${guide.id || '(missing id)'} quickChecks contain invalid entries`);
+                }
+            }
+
+            for (const q of allQ) {
+                if (!q.support || typeof q.support !== 'object') {
+                    fail(`${q.id} missing support metadata`);
+                    continue;
+                }
+                if (!q.support.hint || typeof q.support.hint !== 'string') fail(`${q.id} missing support hint`);
+                if (!q.support.guideId || !guideIds.has(q.support.guideId)) fail(`${q.id} has invalid support guideId '${q.support.guideId}'`);
             }
         }
     }

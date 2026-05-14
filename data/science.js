@@ -2147,3 +2147,401 @@ window.SUBJECT_DATA.science = {
 };
 
 dedupeSciencePromptTexts(window.SUBJECT_DATA.science);
+
+const SCIENCE_LEARNING_GUIDES = [
+    {
+        id: "science-guide-telescope-tools",
+        topicId: "telescope-tools",
+        title: "Using tools and models to study space",
+        intro: "Scientists use different tools and models because space is too large, too far away and too complex to study with the unaided eye alone.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Optical telescopes collect visible light and help observers see faint objects in more detail.",
+                    "Radio telescopes detect radio waves, so they can reveal information an optical telescope cannot show.",
+                    "Scientific models help represent systems, patterns and relationships that cannot be viewed directly."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Name the tool or model first, then explain what kind of information it helps scientists collect.",
+                    "Link observations to evidence by explaining what the scientist can record, compare or measure.",
+                    "If the question mentions repeated observations, explain how patterns over time make conclusions stronger."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A telescope does not change the object in space - it improves the observation.",
+                    "A model is not the real thing - it is a simplified representation used to explain ideas.",
+                    "Different telescopes are used because they detect different kinds of information."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Can I explain what extra evidence the tool gives scientists?",
+            "Have I linked the observation to a stronger scientific explanation?"
+        ]
+    },
+    {
+        id: "science-guide-sky-patterns",
+        topicId: "sky-patterns",
+        title: "Recognising patterns in the sky",
+        intro: "Many sky questions are about noticing regular patterns and then explaining what those patterns tell us about objects viewed from Earth.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Objects such as the Sun and stars appear to move across the sky because Earth rotates.",
+                    "Constellations are patterns of stars as seen from Earth.",
+                    "Planets can change position against the background stars over time."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Identify the pattern first, such as daily movement or changing position over time.",
+                    "Then explain the scientific reason for the pattern, not just what is seen.",
+                    "Use an example observation if the question asks how someone could tell the difference between two objects."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "The apparent motion in the sky is often caused by Earth's movement, not the object travelling around Earth each day.",
+                    "A constellation is a pattern of stars, not a group of planets.",
+                    "Useful sky guides such as the Southern Cross help with direction, not prediction of every event."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I described both the pattern and the reason for it?",
+            "Did I explain the observation from Earth's point of view?"
+        ]
+    },
+    {
+        id: "science-guide-earth-moon-sun",
+        topicId: "earth-moon-sun",
+        title: "Earth, Moon and Sun patterns",
+        intro: "This topic connects everyday observations such as day and night, shadows and Moon phases to the motions of Earth and the Moon.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Earth rotating on its axis causes day and night.",
+                    "Earth orbiting the Sun takes about one year.",
+                    "Moon phases happen because we see different amounts of the Moon's lit half as it orbits Earth."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "State which body is moving first, then explain the pattern that movement creates.",
+                    "Use words such as rotate, orbit, lit half and observed from Earth accurately.",
+                    "If the question asks for observations, include what a person would actually notice in the sky."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Moon phases are not caused by Earth's shadow each night.",
+                    "The Moon does not make its own light - it reflects sunlight.",
+                    "Day and night come from Earth's rotation, not the Moon orbiting Earth."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I named the motion that causes the pattern?",
+            "Did I explain the pattern using correct Earth-Moon-Sun language?"
+        ]
+    },
+    {
+        id: "science-guide-stars-galaxies",
+        topicId: "stars-galaxies",
+        title: "Stars, planets, galaxies and changing scientific ideas",
+        intro: "Questions in this topic often ask students to classify objects in space and explain how better observations can improve scientific models.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "The Sun is a star, and the Solar System is the Sun plus the objects orbiting it.",
+                    "The Milky Way is the galaxy that contains our Solar System.",
+                    "Scientific ideas can be refined or replaced when new evidence becomes available."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Identify the object or structure clearly before giving details about it.",
+                    "If the question is about scientific change, link new observations to improved explanations or models.",
+                    "Use the scale words carefully: planet, star, Solar System, galaxy and Universe are not interchangeable."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A galaxy is much larger than a Solar System.",
+                    "Not every object that shines in the sky is a star.",
+                    "New evidence strengthens science by testing ideas - it does not mean earlier scientists were simply guessing."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I used the correct space term for the object or system?",
+            "If evidence is mentioned, did I explain how it changes understanding?"
+        ]
+    },
+    {
+        id: "science-guide-forces-basics",
+        topicId: "forces-basics",
+        title: "Pushes, pulls and the effects of forces",
+        intro: "Force questions focus on what a push or pull does to an object, such as starting motion, stopping motion, changing speed, changing direction or changing shape.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "A force is a push or a pull.",
+                    "Forces can change an object's speed, direction or shape.",
+                    "Everyday examples help show how forces work in real contexts."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Name the object, then state the force acting on it and the effect of that force.",
+                    "Use a clear cause-and-effect sentence such as 'The push causes the object to speed up'.",
+                    "If more than one force is involved, explain what each force is doing."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A force is the action, not the object itself.",
+                    "Objects do not need to be touched to always have an effect, but many everyday forces are contact forces.",
+                    "Changing shape is also an effect of force, not just changing motion."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I named both the force and the effect?",
+            "Would my example make sense in an everyday situation?"
+        ]
+    },
+    {
+        id: "science-guide-contact-noncontact",
+        topicId: "contact-noncontact",
+        title: "Contact and non-contact forces",
+        intro: "This topic compares forces that need touching with forces that can act across a distance, while also linking those ideas to friction, air resistance and gravity.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Contact forces need touching, such as friction, air resistance and applied force.",
+                    "Non-contact forces act without touching, such as gravity and magnetism.",
+                    "The surface or medium can change how large a contact force becomes."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Decide first whether the force needs touching or not.",
+                    "If the question compares situations, explain what changes the size or effect of the force.",
+                    "Use a concrete example, such as a magnet and paper clip or a parachute and air resistance."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Gravity is non-contact even though objects still fall toward Earth.",
+                    "Friction and air resistance are both contact forces because matter interacts with matter.",
+                    "A magnetic force does not need direct contact to act."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Did I classify the force correctly as contact or non-contact?",
+            "Have I explained why the force changes the motion or result?"
+        ]
+    },
+    {
+        id: "science-guide-balanced-unbalanced",
+        topicId: "balanced-unbalanced",
+        title: "Balanced and unbalanced forces",
+        intro: "Balanced-force questions ask whether forces cancel out, while unbalanced-force questions ask how motion changes when one force is greater than another.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "Balanced forces cause no change in motion, so an object stays still or keeps moving at steady speed.",
+                    "Unbalanced forces cause a change in motion, such as speeding up, slowing down or changing direction.",
+                    "Thinking about the overall or net force helps explain the result."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Compare the forces first and decide whether they cancel out.",
+                    "Then describe the motion that would happen because of that force balance.",
+                    "If numbers are given, use them to justify whether the forces are equal or unequal."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "Balanced does not always mean not moving - it can mean moving at steady speed.",
+                    "Unbalanced forces do not have to make an object move faster only; they can also slow or turn it.",
+                    "The biggest single force is not enough - compare all forces acting on the object."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I decided whether the net force is zero or not?",
+            "Did I describe the correct change in motion?"
+        ]
+    },
+    {
+        id: "science-guide-graphing-data",
+        topicId: "graphing-data",
+        title: "Planning investigations and graphing data",
+        intro: "Graphing questions are about choosing variables carefully, recording data clearly and selecting a graph that matches the investigation.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "The independent variable is what is changed and the dependent variable is what is measured.",
+                    "Fair tests keep control variables the same.",
+                    "Tables and graphs should have labels, units and a clear title."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Start by naming the variables, then explain how the data will be recorded.",
+                    "Choose a graph type that matches the data set and describe what goes on each axis.",
+                    "Mention repeated trials and averages when the question asks about reliability."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "The dependent variable goes on the y-axis because it depends on what was changed.",
+                    "A fair test changes one variable at a time.",
+                    "A graph is not complete if the axes or units are missing."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I correctly named the independent and dependent variables?",
+            "Did I explain how the graph would help show the pattern?"
+        ]
+    },
+    {
+        id: "science-guide-interpreting-graphs",
+        topicId: "interpreting-graphs",
+        title: "Interpreting data and communicating conclusions",
+        intro: "Interpreting-data questions ask students to read patterns carefully, notice anomalies and write conclusions that are supported by evidence instead of opinion.",
+        sections: [
+            {
+                heading: "What to remember",
+                points: [
+                    "A trend describes the overall pattern in the data.",
+                    "An anomaly is a result that does not fit the pattern and may need checking or repeating.",
+                    "Good conclusions use evidence from the data to answer the question."
+                ]
+            },
+            {
+                heading: "How to tackle questions",
+                points: [
+                    "Describe the pattern first, then support it with a detail from the table or graph.",
+                    "If an anomaly is mentioned, explain how it should be checked or handled.",
+                    "Finish with a conclusion that links directly back to the investigation."
+                ]
+            },
+            {
+                heading: "Common mix-ups",
+                points: [
+                    "A conclusion should come from the evidence, not a guess.",
+                    "An anomaly is not ignored automatically - it should be checked against the method or repeated trials.",
+                    "Describing every point one by one is less effective than describing the overall trend clearly."
+                ]
+            }
+        ],
+        quickChecks: [
+            "Have I described the overall trend clearly?",
+            "Did I support my conclusion with evidence from the results?"
+        ]
+    }
+];
+
+const SCIENCE_SUPPORT_HINTS = {
+    "telescope-tools": {
+        mcq: "Think about what the tool or model helps scientists observe, measure or represent more clearly.",
+        short: "Start by naming the observing tool or model, then explain what evidence it helps scientists gather.",
+        long: "Build your response around observations, evidence and how better technology improves scientific understanding."
+    },
+    "sky-patterns": {
+        mcq: "Focus on the pattern an observer sees from Earth and what causes that pattern.",
+        short: "State the sky pattern first, then explain the Earth-based reason for it.",
+        long: "Explain the observed pattern, the movement behind it and one clear example that supports your explanation."
+    },
+    "earth-moon-sun": {
+        mcq: "Ask yourself which motion - rotation, orbit or reflection - creates the pattern in the question.",
+        short: "Name the motion involved first, then link it to the observation people make from Earth.",
+        long: "Organise your answer by explaining each pattern separately and the motion that causes it."
+    },
+    "stars-galaxies": {
+        mcq: "Check whether the question is asking you to classify an object or explain how evidence changes scientific ideas.",
+        short: "Use the correct space term first, then add the detail that proves why it fits.",
+        long: "Define the object or system clearly and then connect new observations to improved scientific models."
+    },
+    "forces-basics": {
+        mcq: "Think about the effect the push or pull has on the object's motion or shape.",
+        short: "Name the force, then explain the change it causes to the object.",
+        long: "Work through the situation by describing each force and the effect it has at each stage."
+    },
+    "contact-noncontact": {
+        mcq: "Decide first whether the force needs touching or can act across a distance.",
+        short: "Classify the force and then explain how it affects the object in that situation.",
+        long: "Compare the forces by explaining how each one acts and why it changes the result."
+    },
+    "balanced-unbalanced": {
+        mcq: "Compare all the forces before deciding whether the motion will stay the same or change.",
+        short: "State whether the forces are balanced, then explain the motion that follows.",
+        long: "Use net force thinking to explain each stage of motion in order."
+    },
+    "graphing-data": {
+        mcq: "Focus on variables, fair testing and which graph or table best shows the results.",
+        short: "Name the variables clearly before explaining how the data should be recorded or graphed.",
+        long: "Structure your answer around variables, fair testing, data recording and graph choice."
+    },
+    "interpreting-graphs": {
+        mcq: "Look for the overall trend and think about what the evidence actually shows.",
+        short: "Describe the pattern first, then support it with a detail from the data.",
+        long: "Explain the trend, mention any anomaly and finish with a conclusion based on evidence."
+    }
+};
+
+function scienceSupportHintFor(question) {
+    const hints = SCIENCE_SUPPORT_HINTS[question.topic];
+    if (!hints) return "Use the key science idea in this topic to explain what the evidence shows.";
+    if (question.options) return hints.mcq;
+    if ((question.marks || 0) >= 8) return hints.long;
+    return hints.short;
+}
+
+function applyScienceSupport(subject) {
+    const allQuestions = [].concat(subject.mcqs || [], subject.short || [], subject.long || []);
+    subject.learningGuides = SCIENCE_LEARNING_GUIDES.map(function (guide) {
+        return Object.assign({}, guide);
+    });
+    allQuestions.forEach(function (question) {
+        question.support = {
+            hint: scienceSupportHintFor(question),
+            guideId: `science-guide-${question.topic}`
+        };
+    });
+}
+
+applyScienceSupport(window.SUBJECT_DATA.science);

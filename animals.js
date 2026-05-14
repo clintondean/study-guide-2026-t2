@@ -109,6 +109,7 @@
 
         function dismiss(immediate) {
             if (removed) return;
+            if (leaveTimer) {
                 clearTimeout(leaveTimer);
                 leaveTimer = null;
             }

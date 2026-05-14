@@ -1,0 +1,15 @@
+{
+  "name": "study-guide-2026-t2",
+  "private": true,
+  "scripts": {
+    "build": "node .github/scripts/build-site.cjs",
+    "syntax-check": "node .github/scripts/check-syntax.cjs",
+    "verify:source-scripts": "node .github/scripts/verify-script-paths.cjs .",
+    "verify:built-scripts": "node .github/scripts/verify-script-paths.cjs _site --built",
+    "validate:data": "node .github/scripts/validate-data.cjs _site",
+    "check": "npm run syntax-check && npm run verify:source-scripts && npm run build && npm run validate:data && npm run verify:built-scripts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

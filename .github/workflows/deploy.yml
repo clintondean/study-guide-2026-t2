@@ -21,49 +21,33 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Quick syntax check (every top-level JS + data)
-        run: |
-          set -e
-          shopt -s nullglob
-          for f in *.js data/*.js; do
-            echo "Checking $f"
-            node --check "$f"
-          done
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check source JavaScript
+        run: npm run syntax-check
+
+      - name: Verify source script targets
+        run: npm run verify:source-scripts
+
+      - name: Build transpiled site
+        run: npm run build
 
       - name: Validate question banks & exam compositions
-        run: node .github/scripts/validate-data.cjs
+        run: npm run validate:data
 
-      - name: Verify every <script src="..."> resolves
-        # Fails the build if index.html references a JS file that isn't on disk —
-        # prevents the "404 in production" class of bug when new files are added
-        # but the deploy stages the wrong list.
+      - name: Verify built script targets
+        run: npm run verify:built-scripts
+
+      - name: Show staged files
         run: |
           set -e
-          missing=0
-          # Pull every relative src out of index.html (one per line)
-          grep -oE 'src="[^"]+"' index.html | sed 's/src="//;s/"$//' | while read -r src; do
-            case "$src" in
-              http*|//*|data:*) continue ;;
-            esac
-            if [ ! -f "$src" ]; then
-              echo "::error::index.html references missing file: $src"
-              missing=1
-            fi
-          done
-          [ "$missing" = 0 ]
-
-      - name: Stage site
-        run: |
-          set -e
-          shopt -s nullglob
-          mkdir -p _site
-          # Top-level static assets — copy every JS, plus the page shell, styles
-          # and required hidden files. Using globs avoids forgetting new files.
-          cp index.html *.js styles.css .nojekyll _site/
-          # Subdirectories needed at runtime
-          cp -r data _site/
-          # Optional: include the handbook directory for reference
-          if [ -d handbook ]; then cp -r handbook _site/; fi
           echo "--- staged files ---"
           find _site -maxdepth 2 -type f | sort
 

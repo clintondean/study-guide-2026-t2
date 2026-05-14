@@ -3,9 +3,11 @@
 ## Project context
 
 A static, single-page web app that helps **Harper** (Year 9, Norwest Christian
-College, NSW Australia) revise for her Term 2 2026 half-yearly exams. Pure
-HTML / CSS / vanilla JS. **No build step**, **no framework**, **no bundler** —
-just script tags loaded in order from `index.html`.
+College, NSW Australia) revise for her Term 2 2026 half-yearly exams. Plain
+HTML / CSS with vanilla browser JS/TS. **No framework, no bundler** — the app
+still uses ordered `<script>` tags in `index.html`, but the repo now has a
+lightweight TypeScript transpile step (`npm run build`) that emits deployable
+files into `_site/`.
 
 The app covers four subjects (Commerce, English Advanced, Geography, Maths
 Pathway-to-Advanced), with content aligned to the Norwest 2026 Year 9
@@ -31,12 +33,13 @@ Cat Invaders, Catanoid), and a Park mini-game.
 
 ## Tech stack
 
-- Vanilla JS (ES2018+: async/await, optional chaining, template literals)
+- Vanilla browser JS/TS (ES2018+: async/await, optional chaining, template literals)
 - Plain CSS, light/dark mode via `prefers-color-scheme`
 - `localStorage` for persistence (key: `harper-studyguide-v1`)
 - Hash-based routing (`#/subject/maths`, `#/clan`, `#/break/catris`, …)
 - Inline SVG for cat illustrations; Canvas for the three break games
 - Google Gemini API for AI-marking (key supplied by the user via Settings)
+- TypeScript compiler + small Node build scripts for transpilation and deployment
 
 ## File layout
 
@@ -52,18 +55,23 @@ Cat Invaders, Catanoid), and a Park mini-game.
 | `tetris.js` | `window.CatTetris.start/stop` — Catris |
 | `invaders.js` | `window.CatInvaders.start/stop` — Cat Invaders |
 | `catanoid.js` | `window.Catanoid.start/stop` — Catanoid |
+| `danger-noodle.js` | `window.DangerNoodle.start/stop` — Danger Noodle |
 | `ai.js` | `window.AI.markAnswer/testKey/getDiscoveredModel` — Gemini integration |
 | `calculator.js` | `window.Calc.open/close` — scientific calculator (shunting-yard, no `eval`) |
 | `data/{subject}.js` | Per-subject question banks (`window.SUBJECT_DATA[id]`) |
+| `types/globals.d.ts` | Ambient typings for gradual TypeScript adoption |
 | `handbook/` | Source PDF (NOT deployed — gitignored from `_site`) |
+| `package.json` / `tsconfig.json` | Build configuration for the TypeScript transpile step |
+| `.github/scripts/build-site.cjs` | Copies static assets and transpiles `.ts` sources into `_site/` |
+| `.github/scripts/verify-script-paths.cjs` | Verifies script-tag targets in source and build output |
 | `.github/workflows/deploy.yml` | GitHub Pages deploy |
 | `.github/scripts/validate-data.cjs` | CI data validator |
 
 ## Module convention
 
-Every JS file follows this IIFE-with-window-export pattern:
+Every browser source file (`.js` or `.ts`) follows this IIFE-with-window-export pattern:
 
-```js
+```ts
 (function () {
     "use strict";
     // private helpers
@@ -74,8 +82,9 @@ Every JS file follows this IIFE-with-window-export pattern:
 ```
 
 Files are loaded in dependency order in `index.html`. **`app.js` is always
-last** because it depends on everything else. Adding a new file means adding
-a `<script src>` line in `index.html`.
+last** because it depends on everything else. `index.html` continues to point
+to emitted `.js` paths, so a browser source file may be authored as `.ts` only
+if the build emits the matching `.js` file before runtime/deploy.
 
 ## State shape
 
@@ -348,19 +357,17 @@ as a template too.
 
 ## Validation & deployment
 
-### Local syntax check
+### Local verification
 
 ```bash
-for f in *.js data/*.js; do node --check "$f" || exit 1; done
-```
-
-### Local data validation
-
-```bash
-node .github/scripts/validate-data.cjs
+npm ci
+npm run check
 ```
 
 This checks:
+- Source JavaScript syntax
+- Source and built `<script src>` resolution
+- The TypeScript transpile step into `_site/`
 - Every question has `id`, `q`, `topic`, valid options/answer or sample
 - Every `practiceTopics[].sourceTopics` references a real topic
 - Every mock has 20+10+2 composition
@@ -370,12 +377,14 @@ This checks:
 
 Push to `main`. `.github/workflows/deploy.yml`:
 
-1. Syntax-checks every top-level `*.js` and `data/*.js`
-2. Runs the data validator
-3. **Verifies every `<script src>` in `index.html` resolves to a file**
-   (this guard exists because we shipped a 404 once — DON'T remove it)
-4. Stages with `cp index.html *.js styles.css .nojekyll _site/`
-5. Deploys to GitHub Pages
+1. Installs the Node/TypeScript toolchain with `npm ci`
+2. Syntax-checks source JavaScript
+3. **Verifies every `<script src>` in `index.html` resolves in source**
+   (allowing `.ts` source counterparts for emitted `.js` targets)
+4. Builds `_site/` via the TypeScript transpile step
+5. Validates question banks against built assets
+6. Verifies built script targets
+7. Uploads `_site/` to GitHub Pages
 
 Prerequisite (one-time): repo Settings → Pages → Source = "GitHub Actions".
 
@@ -413,6 +422,7 @@ them in chat replies. The instruction files and code comments stay plain.
   feedback for written answers).
 - **Custom name in Settings** affects greetings and the brand bar — NOT cat
   backstories.
-- **No external dependencies** beyond the user's optional Gemini key. The
-  app must work offline aside from AI marking.
-- **No build step.** It is and stays a static site.
+- **No runtime dependencies** beyond the user's optional Gemini key. The app
+  must work offline aside from AI marking.
+- **Keep it a static site.** Use the lightweight TypeScript transpile step;
+  don't introduce bundling or frameworks.

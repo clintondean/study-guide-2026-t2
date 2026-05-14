@@ -10,24 +10,27 @@ College, NSW Australia) revise for her Term 2 2026 half-yearly exams in
 Commerce, English Advanced, Geography, and Maths Pathway-to-Advanced.
 Cat-themed by design.
 
-**Plain HTML/CSS/JS. No framework. No bundler. No transpiler. No build
-step.** Files are loaded via ordered `<script>` tags in `index.html` and
-deployed to GitHub Pages as-is.
+**Plain HTML/CSS with vanilla browser JS/TS. No framework. No bundler.**
+Files are still loaded via ordered `<script>` tags in `index.html`, but the
+repo now uses a lightweight TypeScript transpile step (`npm run build`) to
+emit deployable `.js` files into `_site/` for GitHub Pages.
 
 ## Stack constraints
 
-- Vanilla JavaScript only — no React/Vue/Svelte/jQuery/etc.
+- Vanilla browser JavaScript/TypeScript only — no React/Vue/Svelte/jQuery/etc.
 - Plain CSS — no preprocessor, no Tailwind, no PostCSS.
 - ES2018+ syntax is fine (async/await, optional chaining, template
-  literals). Don't use TypeScript syntax in `.js` files.
+  literals). Use TypeScript syntax only in `.ts` files; keep `.js` files
+  valid plain JavaScript.
 - `localStorage` for persistence; key is `harper-studyguide-v1`.
 - Hash-based routing (`window.location.hash`).
-- The only external API call is to Google Gemini (when the user supplies
-  their own key in Settings). Don't propose any other external dependencies.
+- The only runtime external API call is to Google Gemini (when the user
+  supplies their own key in Settings). Keep runtime dependencies at zero; the
+  build toolchain should stay lightweight and TypeScript-focused.
 
-## Module pattern (use this for every JS file)
+## Module pattern (use this for every browser source file)
 
-```js
+```ts
 (function () {
     "use strict";
     function privateHelper() { /* … */ }
@@ -36,10 +39,11 @@ deployed to GitHub Pages as-is.
 })();
 ```
 
-Don't introduce ES modules (`import`/`export`) — they don't work from
-`file://` and the project is intentionally framework-free. Add new files via
-a `<script src="…">` line in `index.html`. Order matters; `app.js` is always
-loaded last.
+Don't introduce browser ES modules (`import`/`export`) — the app still uses
+classic ordered scripts and global `window.*` exports. Add browser entry files
+via a `<script src="…">` line in `index.html`, keep `app.js` loaded last, and
+remember that `index.html` continues to reference emitted `.js` paths even
+when a source file is authored as `.ts`.
 
 ## File map
 
@@ -53,9 +57,13 @@ loaded last.
 | `tetris.js` | `window.CatTetris.{ start, stop }` (Catris) |
 | `invaders.js` | `window.CatInvaders.{ start, stop }` |
 | `catanoid.js` | `window.Catanoid.{ start, stop }` |
+| `danger-noodle.js` | `window.DangerNoodle.{ start, stop }` |
 | `ai.js` | `window.AI.{ markAnswer, testKey, isAvailable, getDiscoveredModel }` |
 | `calculator.js` | `window.Calc.{ open, close, isOpen }` |
 | `data/{subject}.js` | Populates `window.SUBJECT_DATA[id]` for one of `commerce`, `english`, `geography`, `maths` |
+| `types/globals.d.ts` | Ambient browser/global typings for gradual TypeScript adoption |
+| `.github/scripts/build-site.cjs` | Copies static assets and transpiles any `.ts` sources into `_site/` |
+| `.github/scripts/verify-script-paths.cjs` | Verifies script tags resolve in source and build output |
 | `handbook/` | Source PDF — never deployed, never modified |
 
 ## Critical conventions — DO
@@ -155,7 +163,7 @@ mocks additionally:
 | Send `maxOutputTokens` < 1500 to Gemini 2.5 | "Thinking" eats most of the budget. Use `>= 2048` and `thinkingConfig: { thinkingBudget: 0 }`. |
 | Use a free-form prompt for AI marking | Always supply a strict `responseSchema` matching `{ assessment, suggestedMark, feedback, missingPoints }`. |
 | Apply `customName` to cat backstories | Greetings & brand only. Backstories are prose. |
-| Add framework dependencies (npm, bundlers, etc.) | This is a static site. Keep it that way. |
+| Add framework dependencies or a bundler | This stays a static site. The only build dependency should remain the lightweight TypeScript toolchain unless the user asks otherwise. |
 | Skip the `<script src>` verifier in `deploy.yml` | We shipped a 404 once because the workflow had a hard-coded file list. Keep the glob (`*.js`) and the verifier step. |
 | Build with hard-coded canvas dimensions and no `max-height` | The app must work on laptop screens (768px tall). See the `@media (max-height: 800px)` and `(max-height: 680px)` clusters in `styles.css`. |
 
@@ -242,16 +250,14 @@ custom-name token. Use template literals with `customName()`:
 Run from the repo root:
 
 ```bash
-# Syntax check every JS file
-for f in *.js data/*.js; do node --check "$f" || exit 1; done
-
-# Validate the question banks and exam compositions
-node .github/scripts/validate-data.cjs
+npm ci
+npm run check
 ```
 
-CI runs both plus a `<script src>` resolution check. Don't disable any of
-these — they exist because we've already shipped each class of bug they
-catch.
+`npm run build` emits deployable files into `_site/`. `npm run check` runs
+source syntax checks, source/build script-path verification, the TypeScript
+transpile step, and data validation against built assets. Keep those checks in
+CI — they exist because we've already shipped each class of bug they catch.
 
 ## Common code patterns to suggest
 
@@ -319,7 +325,7 @@ const model = window.AI.getDiscoveredModel(); // e.g. "gemini-2.5-flash"
 
 If a suggestion would:
 - Add a new top-level dependency
-- Introduce a build step or transpile step
+- Introduce a new bundler or non-TypeScript build tool
 - Use `eval` or `Function` on user input
 - Change the state-shape without a migration
 - Bypass the warning-modal pattern for a destructive action

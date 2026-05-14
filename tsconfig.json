@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "none",
+    "lib": ["DOM", "ES2018"],
+    "rootDir": ".",
+    "outDir": "_site",
+    "strict": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "*.ts",
+    "data/**/*.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "_site",
+    "node_modules",
+    "handbook",
+    ".github"
+  ]
+}

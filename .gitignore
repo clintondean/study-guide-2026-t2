@@ -1,0 +1,4 @@
+node_modules/
+_site/
+*.tsbuildinfo
+npm-debug.log*

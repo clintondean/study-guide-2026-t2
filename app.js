@@ -40,6 +40,23 @@
         out[year.id] = year;
         return out;
     }, Object.create(null));
+    // Handbook defaults loaded from:
+    // - handbook/Stage-4-Half-Yearly-Exam-Notification-2026-FINAL.pdf
+    // - handbook/Stage-5-Half-Yearly-Examination-Notification-Handbook-2026.pdf
+    const EXAM_DAY_DEFAULTS = {
+        "year-7": {
+            "geography-7": { date: "2026-05-25", detail: "P1 & 2 · 70 mins + 5 mins reading" },
+            "maths-core": { date: "2026-05-26", detail: "P1 & 2 · 70 mins + 5 mins reading" },
+            "science": { date: "2026-05-27", detail: "P1 & 2 · 70 mins + 5 mins reading" },
+            "music-7": { date: "2026-05-28", detail: "P2 · 50 mins + 10 mins set-up" }
+        },
+        "year-9": {
+            "geography": { date: "2026-05-25", detail: "P3 & 4 · 90 mins + 5 mins reading" },
+            "maths": { date: "2026-05-26", detail: "P3 & 4 · 90 mins + 10 mins reading" },
+            "science-9": { date: "2026-05-27", detail: "P3 & 4 · 90 mins + 5 mins reading" },
+            "commerce": { date: "2026-05-28", detail: "P3 & 4 · 90 mins + 5 mins reading" }
+        }
+    };
     const VISUAL_THEMES = [
         {
             id: "sunset",
@@ -124,8 +141,12 @@
                 const mcqPool = (t.sourceTopics || []).flatMap(id => (mcqsByTopic[id] || []).map(q => q.id));
                 const shortPool = (t.sourceTopics || []).flatMap(id => (shortByTopic[id] || []).map(q => q.id));
                 const longPool = (t.sourceTopics || []).flatMap(id => (longByTopic[id] || []).map(q => q.id));
+                // bestScores/examProgress are keyed by examId, so any count increase
+                // must be append-only: keep existing 1..N ids stable and add new
+                // higher-numbered sets after them.
+                const topicExamCount = Math.max(1, Math.floor(t.setCount || PRACTICE_EXAMS_PER_TOPIC));
                 t.examIds = [];
-                for (let n = 1; n <= PRACTICE_EXAMS_PER_TOPIC; n++) {
+                for (let n = 1; n <= topicExamCount; n++) {
                     const examId = `exam-${t.id}-${n}`;
                     const rng = _mulberry32(_hashStr(examId));
                     const long = _pickN(longPool, PRACTICE_LA, rng);
@@ -189,7 +210,8 @@
                 selectedYear: "",
                 selectedSubjects: [],
                 themePreference: "cats",
-                visualTheme: "sunset"
+                visualTheme: "sunset",
+                examSchedule: {}
             },
             stats: { totalAnswered: 0, totalCorrect: 0, currentStreak: 0, bestStreak: 0 },
             clan: {
@@ -228,6 +250,7 @@
         }
         s.settings.themePreference = normalizeThemePreference(s.settings.themePreference);
         s.settings.visualTheme = normalizeVisualTheme(s.settings.visualTheme);
+        s.settings.examSchedule = normalizeExamSchedule(s.settings.examSchedule);
         if (!s.subjects) s.subjects = def.subjects;
         for (const subjId of STATE_SUBJECTS) {
             if (!s.subjects[subjId]) s.subjects[subjId] = def.subjects[subjId];
@@ -269,6 +292,12 @@
         state.breaks = state.breaks || {};
         state.breaks.lastBreakStartISO = new Date().toISOString();
         saveState();
+    }
+
+    function startBreakSession() {
+        if (window.BreakSession.isActive()) return;
+        recordBreakStart();
+        window.BreakSession.start();
     }
 
     function saveState() {
@@ -390,6 +419,79 @@
 
     function currentSelectedSubjects() {
         return normalizeSelectedSubjects(currentSelectedYear(), state.settings && state.settings.selectedSubjects);
+    }
+
+    function sanitizeExamDayEntry(entry) {
+        entry = entry || {};
+        return {
+            date: typeof entry.date === "string" ? entry.date.trim() : "",
+            detail: typeof entry.detail === "string" ? entry.detail.trim() : ""
+        };
+    }
+
+    function normalizeExamSchedule(schedule) {
+        const out = {};
+        if (!schedule || typeof schedule !== "object") return out;
+        Object.keys(schedule).forEach(yearId => {
+            const year = normalizeYearId(yearId);
+            if (!year) return;
+            const yearEntries = schedule[yearId];
+            if (!yearEntries || typeof yearEntries !== "object") return;
+            const validSubjects = new Set(defaultSelectedSubjectsForYear(year));
+            const normalizedYear = {};
+            Object.keys(yearEntries).forEach(subjectId => {
+                const normalizedSubjectId = normalizeSelectedSubjectId(year, subjectId);
+                if (!validSubjects.has(normalizedSubjectId)) return;
+                normalizedYear[normalizedSubjectId] = sanitizeExamDayEntry(yearEntries[subjectId]);
+            });
+            if (Object.keys(normalizedYear).length) out[year] = normalizedYear;
+        });
+        return out;
+    }
+
+    function defaultExamScheduleForYear(yearId) {
+        const year = normalizeYearId(yearId);
+        const defs = EXAM_DAY_DEFAULTS[year] || {};
+        const out = {};
+        Object.keys(defs).forEach(subjectId => {
+            out[subjectId] = sanitizeExamDayEntry(defs[subjectId]);
+        });
+        return out;
+    }
+
+    function examScheduleForYear(yearId) {
+        const year = normalizeYearId(yearId);
+        if (!year) return {};
+        const merged = defaultExamScheduleForYear(year);
+        const overrides = normalizeExamSchedule(state.settings && state.settings.examSchedule)[year] || {};
+        Object.keys(overrides).forEach(subjectId => {
+            merged[subjectId] = sanitizeExamDayEntry(overrides[subjectId]);
+        });
+        return merged;
+    }
+
+    function examDayEventsForSubjects(yearId, subjectIds) {
+        const schedule = examScheduleForYear(yearId);
+        return normalizeSelectedSubjects(yearId, subjectIds).map(subjectId => {
+            const entry = sanitizeExamDayEntry(schedule[subjectId]);
+            if (!entry.date) return null;
+            const subj = window.SUBJECT_DATA[subjectId];
+            return {
+                subjectId,
+                subjectName: subj ? subj.name : subjectId,
+                date: new Date(entry.date + "T12:00:00"),
+                dateKey: entry.date,
+                monthKey: entry.date.slice(0, 7),
+                detail: entry.detail
+            };
+        }).filter(Boolean);
+    }
+
+    function examChipLabel(event) {
+        if (!event || !event.subjectName) return "Exam";
+        if (event.subjectId === "maths-core") return "Maths";
+        if (event.subjectId === "science-9") return "Science";
+        return event.subjectName;
     }
 
     function savedCustomName() {
@@ -1329,7 +1431,7 @@
 
         return `
             <section class="exams-section">
-                <h2>🎯 Practice Questions <span class="section-tag">${subj.practiceExams.length} sets · 20 questions each</span></h2>
+                <h2>🎯 Practice Quizzes <span class="section-tag">${subj.practiceExams.length} quizzes · 20 questions each</span></h2>
                 <p class="section-blurb">Each set is a focused, topic-themed bundle of 20 questions. Answers lock once placed, and you can re-attempt as many times as you like. Help is available on every question. Score 100% to unlock a new pet for your active theme!</p>
                 ${body}
             </section>
@@ -1407,7 +1509,7 @@
         // Practice and mocks keep curated order; other modes shuffle.
         const ordered = exam ? questions : shuffle(questions);
         const isMock = !!(exam && exam.isMock);
-        // Lock-in applies to BOTH Practice Questions and Mock Exams.
+        // Lock-in applies to BOTH Practice Quizzes and Mock Exams.
         const isLockMode = !!exam;
         // Tag each position with a unique key so duplicate question IDs in an
         // exam (allowed when pools are small) get independent session state.
@@ -1794,7 +1896,7 @@
                     </div>
                 ` : (session.isLockMode ? `
                     <div class="mock-banner mock-banner-practice">
-                        🔒 <strong>Practice Questions</strong> — answers lock once you press Next. Use 💡 Help anytime, and re-attempt to improve.
+                        🔒 <strong>Practice Quizzes</strong> — answers lock once you press Next. Use 💡 Help anytime, and re-attempt to improve.
                     </div>
                 ` : "")}
                 <div class="quiz-progress">
@@ -2746,7 +2848,7 @@
         return { kind: "Quiz", label: mode };
     }
 
-    function buildProgressCalendar(subjectIds) {
+    function buildProgressCalendar(yearId, subjectIds) {
         const sessions = [];
         subjectIds.forEach(subjectId => {
             const subj = window.SUBJECT_DATA[subjectId];
@@ -2764,29 +2866,62 @@
                     date: when,
                     dateKey: calendarDateKey(when),
                     monthKey: calendarMonthKey(when),
+                    uniqueKey: `${subjectId}:${entry.mode}`,
                     label: exam && exam.name ? exam.name : entry.mode,
                     subjectName: subj ? subj.name : subjectId
                 });
             });
         });
         sessions.sort((a, b) => a.date.getTime() - b.date.getTime());
+        const examEvents = examDayEventsForSubjects(yearId, subjectIds);
 
         const currentMonth = calendarMonthKey(new Date());
-        const monthKeys = Array.from(new Set(sessions.map(item => item.monthKey).concat(currentMonth))).sort();
+        const monthKeys = Array.from(new Set(sessions.map(item => item.monthKey).concat(examEvents.map(item => item.monthKey), currentMonth))).sort();
         const countsByDate = Object.create(null);
-        const totals = { practice: 0, mock: 0 };
+        const countsByMonth = Object.create(null);
+        const examsByDate = Object.create(null);
+        const examCountsByMonth = Object.create(null);
 
         sessions.forEach(item => {
-            const bucket = countsByDate[item.dateKey] || (countsByDate[item.dateKey] = { practice: 0, mock: 0, total: 0 });
-            bucket[item.kind]++;
-            bucket.total++;
-            totals[item.kind]++;
+            const dateBucket = countsByDate[item.dateKey] || (countsByDate[item.dateKey] = {
+                practice: 0,
+                mock: 0,
+                total: 0,
+                seen: { practice: Object.create(null), mock: Object.create(null) }
+            });
+            if (!dateBucket.seen[item.kind][item.uniqueKey]) {
+                dateBucket.seen[item.kind][item.uniqueKey] = true;
+                dateBucket[item.kind]++;
+                dateBucket.total++;
+            }
+
+            const monthBucket = countsByMonth[item.monthKey] || (countsByMonth[item.monthKey] = {
+                practice: 0,
+                mock: 0,
+                total: 0,
+                seen: { practice: Object.create(null), mock: Object.create(null) }
+            });
+            if (!monthBucket.seen[item.kind][item.uniqueKey]) {
+                monthBucket.seen[item.kind][item.uniqueKey] = true;
+                monthBucket[item.kind]++;
+                monthBucket.total++;
+            }
+        });
+
+        Object.keys(countsByDate).forEach(dateKey => { delete countsByDate[dateKey].seen; });
+        Object.keys(countsByMonth).forEach(monthKey => { delete countsByMonth[monthKey].seen; });
+        examEvents.forEach(item => {
+            const dateBucket = examsByDate[item.dateKey] || (examsByDate[item.dateKey] = []);
+            dateBucket.push(item);
+            examCountsByMonth[item.monthKey] = (examCountsByMonth[item.monthKey] || 0) + 1;
         });
 
         return {
             countsByDate,
+            countsByMonth,
+            examsByDate,
+            examCountsByMonth,
             monthKeys,
-            totals,
             defaultMonthKey: sessions.some(item => item.monthKey === currentMonth) || !sessions.length
                 ? currentMonth
                 : monthKeys[monthKeys.length - 1]
@@ -2802,7 +2937,8 @@
         const daysInMonth = new Date(parsed.year, parsed.monthIndex + 1, 0).getDate();
         const todayKey = calendarDateKey(new Date());
         const cells = [];
-        const totals = { practice: 0, mock: 0 };
+        const totals = Object.assign({ practice: 0, mock: 0, total: 0 }, calendar.countsByMonth[monthKey] || {});
+        totals.exams = calendar.examCountsByMonth[monthKey] || 0;
 
         for (let i = 0; i < leadingPads; i++) cells.push({ isPad: true });
 
@@ -2810,12 +2946,12 @@
             const date = new Date(parsed.year, parsed.monthIndex, day);
             const dateKey = calendarDateKey(date);
             const counts = calendar.countsByDate[dateKey] || { practice: 0, mock: 0, total: 0 };
-            totals.practice += counts.practice;
-            totals.mock += counts.mock;
+            const exams = calendar.examsByDate[dateKey] || [];
             cells.push({
                 day,
                 dateKey,
                 counts,
+                exams,
                 isToday: dateKey === todayKey
             });
         }
@@ -2835,9 +2971,13 @@
         if (!month) return "";
 
         const monthIndex = calendar.monthKeys.indexOf(monthKey);
-        const summaryText = (month.totals.practice || month.totals.mock)
-            ? `${month.totals.practice} ${pluralize(month.totals.practice, "practice quiz", "practice quizzes")} and ${month.totals.mock} ${pluralize(month.totals.mock, "mock exam")} completed in ${month.label}.`
-            : `No practice quizzes or mock exams completed in ${month.label} yet.`;
+        const summaryParts = [];
+        if (month.totals.practice) summaryParts.push(`${month.totals.practice} unique ${pluralize(month.totals.practice, "practice quiz", "practice quizzes")}`);
+        if (month.totals.mock) summaryParts.push(`${month.totals.mock} unique ${pluralize(month.totals.mock, "mock exam")}`);
+        if (month.totals.exams) summaryParts.push(`${month.totals.exams} ${pluralize(month.totals.exams, "exam day")}`);
+        const summaryText = summaryParts.length
+            ? `${summaryParts.join(" and ")} in ${month.label}.`
+            : `No unique practice quizzes, mock exams, or exam days in ${month.label} yet.`;
 
         return `
             <section class="progress-calendar-card">
@@ -2853,8 +2993,9 @@
                     </div>
                 </div>
                 <div class="progress-calendar-legend">
-                    <span class="progress-calendar-pill is-practice">🎯 Practice ${month.totals.practice}</span>
-                    <span class="progress-calendar-pill is-mock">📝 Mock ${month.totals.mock}</span>
+                    <span class="progress-calendar-pill is-practice">🎯 Unique Practice ${month.totals.practice}</span>
+                    <span class="progress-calendar-pill is-mock">📝 Unique Mock ${month.totals.mock}</span>
+                    <span class="progress-calendar-pill is-exam">📅 Exam Days ${month.totals.exams}</span>
                 </div>
                 <div class="progress-calendar-weekdays" aria-hidden="true">
                     <span>Mon</span>
@@ -2869,13 +3010,17 @@
                     ${month.cells.map(cell => {
                         if (cell.isPad) return `<div class="progress-calendar-pad" aria-hidden="true"></div>`;
                         const parts = cell.dateKey.split("-").map(Number);
-                        const dayTitle = `${new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}: ${cell.counts.practice} ${pluralize(cell.counts.practice, "practice quiz", "practice quizzes")}, ${cell.counts.mock} ${pluralize(cell.counts.mock, "mock exam")}`;
+                        const examSummary = cell.exams.length
+                            ? ` Exams: ${cell.exams.map(exam => `${exam.subjectName}${exam.detail ? ` (${exam.detail})` : ""}`).join(", ")}.`
+                            : "";
+                        const dayTitle = `${new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}: ${cell.counts.practice} unique ${pluralize(cell.counts.practice, "practice quiz", "practice quizzes")}, ${cell.counts.mock} unique ${pluralize(cell.counts.mock, "mock exam")}.${examSummary}`;
                         return `
-                            <div class="progress-calendar-day ${cell.counts.total ? "has-activity" : ""} ${cell.isToday ? "is-today" : ""}" title="${escapeHtml(dayTitle)}">
+                            <div class="progress-calendar-day ${cell.counts.total ? "has-activity" : ""} ${cell.exams.length ? "has-exam" : ""} ${cell.isToday ? "is-today" : ""}" title="${escapeHtml(dayTitle)}">
                                 <div class="progress-calendar-date">${cell.day}</div>
                                 <div class="progress-calendar-counts">
                                     ${cell.counts.practice ? `<span class="progress-calendar-chip is-practice">🎯 ${cell.counts.practice}</span>` : ""}
                                     ${cell.counts.mock ? `<span class="progress-calendar-chip is-mock">📝 ${cell.counts.mock}</span>` : ""}
+                                    ${cell.exams.map(exam => `<span class="progress-calendar-chip is-exam">📅 ${escapeHtml(examChipLabel(exam))}</span>`).join("")}
                                 </div>
                             </div>
                         `;
@@ -2927,7 +3072,7 @@
             `;
         }).join("");
         const summary = selectedStudySummary();
-        const calendar = buildProgressCalendar(liveIds);
+        const calendar = buildProgressCalendar(currentSelectedYear(), liveIds);
         if (!progressCalendarMonthKey || calendar.monthKeys.indexOf(progressCalendarMonthKey) === -1) {
             progressCalendarMonthKey = calendar.defaultMonthKey;
         }
@@ -3466,11 +3611,7 @@
             renderBreakLockout(root, remaining);
             return;
         }
-        // Lazy-start the shared session timer when first arriving at the hub
-        if (!window.BreakSession.isActive()) {
-            recordBreakStart();
-            window.BreakSession.start();
-        }
+        const breakIsActive = window.BreakSession.isActive();
         const cards = BREAK_GAMES.map(g => `
             <a class="break-game-card" href="#/break/${g.id}" style="--accent:${g.color}">
                 <div class="break-game-icon">${g.icon}</div>
@@ -3479,31 +3620,40 @@
                 <div class="break-game-high">🏆 Best: <strong>${highScoreFor(g.id)}</strong></div>
             </a>
         `).join("");
+        const hubAction = breakIsActive
+            ? `<a class="ghost-btn" href="#/" id="break-hub-end">🚪 End break early</a>`
+            : `<a class="ghost-btn" href="#/">← Back to study</a>`;
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
             <header class="break-hub-header">
                 <div>
                     <h1>☕ Take a break</h1>
-                    <p>Pick a game. The 5-minute timer is shared across every game — switch freely whenever you like.</p>
+                    <p>Pick a game. We'll ask before starting the 5-minute shared break timer, then you can switch freely whenever you like.</p>
                 </div>
                 <div class="tetris-timer-wrap">
-                    <div class="tetris-timer-label" id="break-hub-label">Time left</div>
+                    <div class="tetris-timer-label" id="break-hub-label">${breakIsActive ? "Time left" : "Starts when you say yes"}</div>
                     <div class="tetris-timer" id="break-hub-timer">5:00</div>
                 </div>
             </header>
             <section class="break-hub-grid">${cards}</section>
             <div class="break-hub-actions">
-                <a class="ghost-btn" href="#/" id="break-hub-end">🚪 End break early</a>
+                ${hubAction}
             </div>
         `;
         // Live shared-timer ticker
         if (window._breakHubTimer) clearInterval(window._breakHubTimer);
         const tick = () => {
-            const r = window.BreakSession.BREAK_MS - window.BreakSession.elapsed();
             const elem = document.getElementById("break-hub-timer");
             const label = document.getElementById("break-hub-label");
             if (!elem) return;
+            if (!window.BreakSession.isActive()) {
+                elem.textContent = "5:00";
+                elem.classList.remove("overtime");
+                if (label) label.textContent = "Starts when you say yes";
+                return;
+            }
+            const r = window.BreakSession.BREAK_MS - window.BreakSession.elapsed();
             if (r > 0) {
                 const m = Math.floor(r / 60000);
                 const s = Math.floor((r % 60000) / 1000);
@@ -3520,7 +3670,9 @@
             }
         };
         tick();
-        window._breakHubTimer = setInterval(tick, 500);
+        if (window.BreakSession.isActive()) {
+            window._breakHubTimer = setInterval(tick, 500);
+        }
     }
 
     function renderBreakGame(root, gameId) {
@@ -3532,8 +3684,8 @@
                 renderBreakLockout(root, remaining);
                 return;
             }
-            recordBreakStart();
-            window.BreakSession.start();
+            renderBreakStartPrompt(root, gameId);
+            return;
         }
         const game = BREAK_GAMES.find(g => g.id === gameId);
         if (!game) { navigate("/break"); return; }
@@ -3546,6 +3698,34 @@
         if (gameId === "invaders") return window.CatInvaders.start(root, opts);
         if (gameId === "catanoid") return window.Catanoid.start(root, opts);
         if (gameId === "danger-noodle") return window.DangerNoodle.start(root, opts);
+    }
+
+    function renderBreakStartPrompt(root, gameId) {
+        const game = BREAK_GAMES.find(g => g.id === gameId);
+        if (!game) { navigate("/break"); return; }
+
+        root.innerHTML = `
+            <a class="back-link" href="#/break">← Back to games</a>
+            <section class="break-start-card" style="--accent:${game.color}">
+                <div class="break-start-icon">${game.icon}</div>
+                <h1>Start your break?</h1>
+                <p class="break-blurb">You're about to play <strong>${escapeHtml(game.name)}</strong>. Your 5-minute break timer will only begin once you choose to start.</p>
+                <div class="break-countdown">
+                    <div class="break-countdown-num">5:00</div>
+                    <div class="break-countdown-sub">shared across every break game</div>
+                </div>
+                <p class="break-meta">Once it starts, you can swap to another break game any time and keep the same timer running.</p>
+                <div class="break-lockout-actions">
+                    <button type="button" class="primary-btn" id="break-start-confirm">▶ Start break and play ${escapeHtml(game.name)}</button>
+                    <a class="ghost-btn" href="#/break">Not yet</a>
+                </div>
+            </section>
+        `;
+
+        document.getElementById("break-start-confirm").addEventListener("click", () => {
+            startBreakSession();
+            render();
+        });
     }
 
     function renderBreakLockout(root, remainingMs) {
@@ -4519,6 +4699,29 @@
         const profileDraft = resolveProfileDraft(draft);
         const activeTheme = currentThemeId();
         const activeVisualTheme = currentVisualTheme();
+        const examYearId = normalizeYearId(profileDraft.yearId) || currentSelectedYear();
+        const examSubjects = examYearId ? subjectOptionsForYear(examYearId) : [];
+        const examSchedule = examYearId ? examScheduleForYear(examYearId) : {};
+        const examRows = examSubjects.map(subject => {
+            const subj = window.SUBJECT_DATA[subject.id];
+            const entry = sanitizeExamDayEntry(examSchedule[subject.id]);
+            return `
+                <div class="exam-day-row">
+                    <div class="exam-day-subject">
+                        <strong>${subj ? escapeHtml(subj.name) : escapeHtml(subject.id)}</strong>
+                        <span>${entry.detail ? escapeHtml(entry.detail) : "No exam day set yet."}</span>
+                    </div>
+                    <label class="settings-field exam-day-field">
+                        <span>Date</span>
+                        <input type="date" data-exam-date="${subject.id}" value="${escapeHtml(entry.date)}">
+                    </label>
+                    <label class="settings-field exam-day-field exam-day-detail-field">
+                        <span>Time / notes</span>
+                        <input type="text" data-exam-detail="${subject.id}" value="${escapeHtml(entry.detail)}" placeholder="e.g. P3 & 4 · 90 mins">
+                    </label>
+                </div>
+            `;
+        }).join("");
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
@@ -4588,6 +4791,20 @@
             </section>
 
             <section class="settings-section">
+                <h2>🗓️ Exam days</h2>
+                ${examYearId ? `
+                    <p class="settings-help">These handbook defaults are loaded from the official exam notification PDFs for <strong>${escapeHtml(yearLabel(examYearId))}</strong>. You can update them here any time. Blank dates are hidden from the Study Calendar.</p>
+                    <div class="exam-day-grid">${examRows}</div>
+                    <div class="settings-actions">
+                        <button type="button" class="primary-btn" id="settings-save-exams">Save exam days</button>
+                        <button type="button" class="ghost-btn" id="settings-reset-exams">Reset handbook defaults</button>
+                    </div>
+                ` : `
+                    <p class="settings-help">Choose a study year above to load and edit exam days for that year.</p>
+                `}
+            </section>
+
+            <section class="settings-section">
                 <h2>💾 Backup &amp; restore</h2>
                 <p class="settings-help">Save a complete snapshot of your progress (cats, pets, scores, answers, settings) to a JSON file you can keep or move to another device.</p>
                 <div class="settings-actions">
@@ -4638,6 +4855,47 @@
                 announceThemeChange(`${visualThemeMeta(nextTheme).label} theme activated!`);
             });
         });
+        const saveExamsBtn = $("#settings-save-exams");
+        if (saveExamsBtn && examYearId) {
+            saveExamsBtn.addEventListener("click", () => {
+                const defaults = defaultExamScheduleForYear(examYearId);
+                const nextSchedule = normalizeExamSchedule(state.settings.examSchedule);
+                const yearOverrides = {};
+                examSubjects.forEach(subject => {
+                    const dateInput = root.querySelector(`[data-exam-date="${subject.id}"]`);
+                    const detailInput = root.querySelector(`[data-exam-detail="${subject.id}"]`);
+                    const nextEntry = sanitizeExamDayEntry({
+                        date: dateInput ? dateInput.value : "",
+                        detail: detailInput ? detailInput.value : ""
+                    });
+                    const defaultEntry = sanitizeExamDayEntry(defaults[subject.id]);
+                    if (!nextEntry.date && !defaultEntry.date && !nextEntry.detail && !defaultEntry.detail) return;
+                    if (!nextEntry.date && (defaultEntry.date || defaultEntry.detail)) {
+                        yearOverrides[subject.id] = nextEntry;
+                        return;
+                    }
+                    if (nextEntry.date === defaultEntry.date && nextEntry.detail === defaultEntry.detail) return;
+                    if (nextEntry.date || nextEntry.detail) yearOverrides[subject.id] = nextEntry;
+                });
+                if (Object.keys(yearOverrides).length) nextSchedule[examYearId] = yearOverrides;
+                else delete nextSchedule[examYearId];
+                state.settings.examSchedule = nextSchedule;
+                saveState();
+                renderSettings(root, profileDraft);
+                mascotPopIn({ expression: "proud", message: "Exam days updated!", duration: 2200 });
+            });
+        }
+        const resetExamsBtn = $("#settings-reset-exams");
+        if (resetExamsBtn && examYearId) {
+            resetExamsBtn.addEventListener("click", () => {
+                const nextSchedule = normalizeExamSchedule(state.settings.examSchedule);
+                delete nextSchedule[examYearId];
+                state.settings.examSchedule = nextSchedule;
+                saveState();
+                renderSettings(root, profileDraft);
+                mascotPopIn({ expression: "wave", message: "Handbook defaults restored.", duration: 2200 });
+            });
+        }
 
         const keyInput = $("#settings-key");
         $("#settings-key-show").addEventListener("click", () => {

@@ -2059,7 +2059,7 @@ window.SUBJECT_DATA.science = {
     ],
 
     /* =========================================================
-       PRACTICE QUESTIONS — 3 topic groups × 10 exams × 20 questions.
+       PRACTICE QUIZZES — 30 quizzes total × 20 questions.
        Generated at boot from `practiceTopics`.
        ========================================================= */
     practiceTopics: [
@@ -2067,13 +2067,15 @@ window.SUBJECT_DATA.science = {
             id: "universe-skills",
             name: "Observing the Universe & Science Skills",
             outcomes: "SC4-OTU-01 · SC4-WS-05 · SC4-WS-08",
-            sourceTopics: ["telescope-tools", "sky-patterns", "earth-moon-sun", "stars-galaxies", "graphing-data", "interpreting-graphs"]
+            sourceTopics: ["telescope-tools", "sky-patterns", "earth-moon-sun", "stars-galaxies", "graphing-data", "interpreting-graphs"],
+            setCount: 15
         },
         {
             id: "forces",
             name: "Forces in Everyday Contexts",
             outcomes: "SC4-FOR-01 · SC4-WS-08",
-            sourceTopics: ["forces-basics", "contact-noncontact", "balanced-unbalanced"]
+            sourceTopics: ["forces-basics", "contact-noncontact", "balanced-unbalanced"],
+            setCount: 15
         }
     ],
     practiceExams: [],

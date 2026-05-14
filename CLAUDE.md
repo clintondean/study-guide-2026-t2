@@ -132,13 +132,19 @@ attempts.
 This is a real bug we already shipped once — search for `keyOf(q)` before
 introducing any `session.answers[q.id]`.
 
-### Practice exams are generated at boot
+### Practice quizzes are generated at boot
 
 `generatePracticeExams()` in `app.js` runs once on load and replaces every
 subject's `practiceExams` with a fresh deterministic list built from
 `practiceTopics`. Each exam = `PRACTICE_MCQ` + `PRACTICE_SA` + `PRACTICE_LA`
-(currently 14 + 5 + 1 = 20). 10 exams per topic. **Don't hand-author
+(currently 14 + 5 + 1 = 20). The default is 10 quizzes per topic, but a
+topic can override that with `setCount`. **Don't hand-author
 `practiceExams`** — define `practiceTopics` and let the generator do it.
+
+When expanding generated practice-quiz counts, keep the change **append-only**.
+`bestScores` and `examProgress` are keyed by `examId`, so existing generated
+IDs must stay stable; add new higher-numbered sets via `setCount` instead of
+renaming, renumbering, or reshuffling existing ones.
 
 ### Mock exam structure is hand-curated
 
@@ -187,7 +193,7 @@ substitutions read awkwardly mid-paragraph.
 - The parser has 5 fallback passes (strict JSON, fences-stripped, regex
   block, brace-balancing repair, regex field extraction). **Don't simplify
   it** — Gemini sometimes truncates and the fallbacks recover.
-- Practice questions: AI marking is **on-demand** (a button per question).
+- Practice quizzes: AI marking is **on-demand** (a button per question).
   Mock exams: AI marking is **automatic** at submit (sequential, with progress
   UI). Both cache results in `examProgress.answers[k].aiFeedback` so retakes
   don't re-spend quota.
@@ -324,11 +330,15 @@ Edit `data/{subject}.js`, append to `practiceTopics: []`:
 { id: "new-topic",
   name: "Display name",
   outcomes: "MA5-...",
-  sourceTopics: ["existing-topic-id-1", "existing-topic-id-2"] }
+  sourceTopics: ["existing-topic-id-1", "existing-topic-id-2"],
+  setCount: 10 }   // optional; defaults to 10
 ```
 
 Each `sourceTopics` entry must match an existing `topics[].id` in the same
-subject. The generator builds 10 exams from this topic at next boot.
+subject. The generator builds 10 quizzes from this topic at next boot unless
+`setCount` overrides it. If you increase the count later, extend it
+append-only so existing `examId`s — and therefore student progress — remain
+unchanged.
 
 ### Add a new cat breed
 

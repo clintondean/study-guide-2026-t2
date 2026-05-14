@@ -5047,7 +5047,8 @@ window.SUBJECT_DATA["music-7"] = {
             id: "complete-review",
             name: "Year 7 Music Complete Review",
             outcomes: "MU4-LIS-01",
-            sourceTopics: ["pitch-scales", "duration-rhythm", "structure-form", "dynamics-tempo"]
+            sourceTopics: ["pitch-scales", "duration-rhythm", "structure-form", "dynamics-tempo"],
+            setCount: 30
         }
     ],
     practiceExams: [],

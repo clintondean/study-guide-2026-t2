@@ -6603,7 +6603,8 @@ window.SUBJECT_DATA["geography-7"] = {
             id: "complete-review",
             name: "Year 7 Geography Complete Review",
             outcomes: "GE4-COM-01 · GE4-PER-01 · GE4-MAN-01 · GE4-DFC-01",
-            sourceTopics: ["mapping-skills", "direction-scale", "landscapes-features", "geomorphic-processes", "water-resources", "catchments-management"]
+            sourceTopics: ["mapping-skills", "direction-scale", "landscapes-features", "geomorphic-processes", "water-resources", "catchments-management"],
+            setCount: 30
         }
     ],
     practiceExams: [],

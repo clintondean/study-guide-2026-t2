@@ -39,14 +39,22 @@
         slowBall:   { label: "SLOW",emoji: "🐌",  color: "#ffd166", text: "Slow-mo!",      ms: 10000, good: true },
         extraLife:  { label: "♥",   emoji: "❤️",  color: "#ff5b8b", text: "Extra life!",   ms: 0,     good: true },
         sticky:     { label: "STKY",emoji: "🪝",  color: "#7d5a3c", text: "Sticky paddle!",ms: 9000,  good: true },
+        pistol:     { label: "PEW", emoji: "🔫",  color: "#3da9fc", text: "Paddle pistol!",ms: 10000, good: true },
         fastBall:   { label: "FAST",emoji: "⚡",  color: "#ff7f51", text: "Speed up!",     ms: 7000,  good: false }
     };
     const POWERUP_KEYS = Object.keys(POWERUPS);
 
-    const SPEED_BUMP_PER_PADDLE_HIT = 1.025;   // +2.5% each paddle hit
-    const SPEED_BUMP_PER_TICK = 1.0008;        // very slight passive ramp per frame
+    const BASE_BALL_SPEED = 2;
+    const LEVEL_SPEED_STEP = 0.075;
+    const LEVEL_BASE_SPEED_BUMP = 0.1;
+    const SPEED_BUMP_PER_PADDLE_HIT = 1.00625; // +0.625% each paddle hit
+    const SPEED_BUMP_PER_TICK = 1.0002;        // very slight passive ramp per frame
     const MAX_SPEED_MUL = 2.4;                 // cap
     const MOD_BAD_BIAS = 0.35;                 // ~35% of powerup drops are bad ones
+    const PISTOL_SHOT_SPEED = 10;
+    const PISTOL_SHOT_W = 5;
+    const PISTOL_SHOT_H = 16;
+    const PISTOL_SHOT_COOLDOWN_MS = 240;
 
     let canvas, ctx, rootEl;
     let onExit, onHighScore, getHighScore = () => 0;
@@ -84,7 +92,7 @@
             <header class="break-game-header">
                 <div>
                     <h1>🧱 Catanoid</h1>
-                    <p class="break-game-blurb">Smash the brick-cats. Move with mouse OR ←/→. Space to launch. Ball gets faster every paddle bounce!</p>
+                    <p class="break-game-blurb">Smash the brick-cats. Move with mouse OR ←/→. Space to launch, or fire a PEW pill paddle pistol when it's active.</p>
                 </div>
                 <div class="tetris-timer-wrap">
                     <div class="tetris-timer-label" id="catanoid-timer-label">Time left</div>
@@ -104,11 +112,11 @@
             <div class="tetris-touch break-touch">
                 <div class="tetris-touch-row">
                     <button type="button" data-act="left">←</button>
-                    <button type="button" data-act="launch">🚀 Launch</button>
+                    <button type="button" data-act="launch">🚀 Launch / Pew</button>
                     <button type="button" data-act="right">→</button>
                 </div>
             </div>
-            <p class="break-help">Don't drop the ball! Cleared all bricks? Next level — faster ball.</p>
+            <p class="break-help">Don't drop the ball! Cleared all bricks? Next level. Catch a PEW pill for 10 seconds of paddle blasters.</p>
         `;
         canvas = document.getElementById("catanoid-canvas");
         ctx = canvas.getContext("2d");
@@ -118,7 +126,7 @@
             const rect = canvas.getBoundingClientRect();
             mouseX = (e.clientX - rect.left) * (W / rect.width);
         });
-        canvas.addEventListener("pointerdown", () => { if (state && anyBallOnPaddle()) launchBall(); });
+        canvas.addEventListener("pointerdown", () => { if (state) handleLaunchOrFire(); });
         rootEl.querySelectorAll(".break-touch [data-act]").forEach(b => {
             b.addEventListener("pointerdown", () => handleTouch(b.dataset.act, true));
             b.addEventListener("pointerup",   () => handleTouch(b.dataset.act, false));
@@ -129,7 +137,7 @@
     function handleTouch(act, down) {
         if (act === "left")  keys.left = down;
         if (act === "right") keys.right = down;
-        if (act === "launch" && down && state && anyBallOnPaddle()) launchBall();
+        if (act === "launch" && down && state) handleLaunchOrFire();
     }
 
     function bindInput() {
@@ -137,7 +145,7 @@
         const down = (e) => {
             if (e.key === "ArrowLeft")  { keys.left = true; e.preventDefault(); }
             else if (e.key === "ArrowRight") { keys.right = true; e.preventDefault(); }
-            else if (e.key === " ") { if (state && anyBallOnPaddle()) launchBall(); e.preventDefault(); }
+            else if (e.key === " ") { if (state) handleLaunchOrFire(); e.preventDefault(); }
             else if (e.key.toLowerCase() === "p") { togglePause(); e.preventDefault(); }
         };
         const up = (e) => {
@@ -155,8 +163,9 @@
         state = Object.assign(state || {}, {
             paddle: { x: W / 2 - PADDLE_W / 2, y: PADDLE_Y },
             balls: [makeStartingBall()],
+            shots: [],
             powerups: [],
-            mods: { paddleSizeMul: 1, ballSizeMul: 1, ballSpeedMul: 1, sticky: false },
+            mods: { paddleSizeMul: 1, ballSizeMul: 1, ballSpeedMul: 1, sticky: false, pistol: false },
             modExpiry: {},  // key -> timestamp ms
             popups: [],     // floating text after collecting a powerup
             bricks: spawnBricks(),
@@ -165,7 +174,8 @@
             lives: 3,
             paused: false,
             gameOver: false,
-            baseSpeed: 4
+            baseSpeed: BASE_BALL_SPEED,
+            lastPistolShotAt: 0
         });
         if (!state.keyHandler) bindInput();
         state.timerInterval = setInterval(renderTimer, 250);
@@ -208,13 +218,38 @@
         if (!ball) return;
         ball.onPaddle = false;
         const angle = (Math.random() * 0.6 - 0.3) - Math.PI / 2;
-        const speed = (state.baseSpeed + state.level * 0.3) * (state.mods.ballSpeedMul || 1);
+        const speed = currentBallSpeed();
         ball.vx = Math.cos(angle) * speed;
         ball.vy = Math.sin(angle) * speed;
     }
 
     function anyBallOnPaddle() {
         return state.balls.some(b => b.onPaddle);
+    }
+
+    function currentBallSpeed() {
+        return (state.baseSpeed + state.level * LEVEL_SPEED_STEP) * (state.mods.ballSpeedMul || 1);
+    }
+
+    function handleLaunchOrFire() {
+        if (state.paused || state.gameOver) return;
+        if (anyBallOnPaddle()) {
+            launchBall();
+            return;
+        }
+        if (state.mods.pistol) firePistol();
+    }
+
+    function firePistol() {
+        const now = performance.now();
+        if (now - state.lastPistolShotAt < PISTOL_SHOT_COOLDOWN_MS) return;
+        const padW = paddleWidth();
+        const baseY = state.paddle.y - 10;
+        state.shots.push(
+            { x: state.paddle.x + 16, y: baseY },
+            { x: state.paddle.x + padW - 16, y: baseY }
+        );
+        state.lastPistolShotAt = now;
     }
 
     function loop() {
@@ -262,7 +297,7 @@
             ball.vy *= SPEED_BUMP_PER_TICK;
             // Cap absolute speed
             const sp = Math.hypot(ball.vx, ball.vy);
-            const maxSp = (state.baseSpeed + state.level * 0.3) * MAX_SPEED_MUL * (state.mods.ballSpeedMul || 1);
+            const maxSp = currentBallSpeed() * MAX_SPEED_MUL;
             if (sp > maxSp) {
                 const k = maxSp / sp;
                 ball.vx *= k; ball.vy *= k;
@@ -315,6 +350,25 @@
         // Spawn powerups for any bricks broken this frame
         for (const p of newBricksToSpawnPowerups) spawnPowerup(p.x, p.y);
 
+        // ---- Paddle pistol shots ----
+        for (const shot of state.shots) {
+            shot.y -= PISTOL_SHOT_SPEED;
+            for (const br of state.bricks) {
+                if (!br.alive) continue;
+                if (shot.x + PISTOL_SHOT_W / 2 > br.x && shot.x - PISTOL_SHOT_W / 2 < br.x + BRICK_W &&
+                    shot.y + PISTOL_SHOT_H / 2 > br.y && shot.y - PISTOL_SHOT_H / 2 < br.y + BRICK_H) {
+                    br.alive = false;
+                    shot.dead = true;
+                    state.score += ROW_BREEDS[br.row].points;
+                    if (Math.random() < POWERUP_DROP_CHANCE) {
+                        spawnPowerup(br.x + BRICK_W / 2, br.y + BRICK_H / 2);
+                    }
+                    break;
+                }
+            }
+        }
+        state.shots = state.shots.filter(shot => !shot.dead && shot.y + PISTOL_SHOT_H / 2 > 0);
+
         // ---- Power-up movement & catch ----
         for (const pu of state.powerups) {
             pu.y += POWERUP_FALL_SPEED;
@@ -342,11 +396,14 @@
             state.mods.ballSizeMul = 1;
             state.mods.ballSpeedMul = 1;
             state.mods.sticky = false;
+            state.mods.pistol = false;
+            state.shots = [];
             // Keep paddle size as-is; reset modExpiry for ball ones
             delete state.modExpiry.growBall;
             delete state.modExpiry.slowBall;
             delete state.modExpiry.fastBall;
             delete state.modExpiry.sticky;
+            delete state.modExpiry.pistol;
         }
 
         // ---- Floating popups ----
@@ -358,9 +415,10 @@
             state.level++;
             state.bricks = spawnBricks();
             state.balls = [makeStartingBall()];
+            state.shots = [];
             state.powerups = [];
             state.score += 100;
-            state.baseSpeed += 0.4;
+            state.baseSpeed += LEVEL_BASE_SPEED_BUMP;
         }
 
         updateHud();
@@ -407,6 +465,11 @@
         if (type === "growBall") { state.mods.ballSizeMul = 1.8; state.modExpiry.growBall = now + cfg.ms; return; }
         if (type === "growPad")  { state.mods.paddleSizeMul = 1.6; state.modExpiry.growPad = now + cfg.ms; return; }
         if (type === "shrinkPad"){ state.mods.paddleSizeMul = 0.65; state.modExpiry.shrinkPad = now + cfg.ms; return; }
+        if (type === "pistol") {
+            state.mods.pistol = true;
+            state.modExpiry.pistol = now + cfg.ms;
+            return;
+        }
         if (type === "slowBall") {
             state.mods.ballSpeedMul = 0.6;
             // Apply immediately to live balls
@@ -449,13 +512,16 @@
                     // Auto-launch any stuck ball when sticky expires
                     if (b.vx === 0 && b.vy === 0) {
                         const angle = (Math.random() * 0.4 - 0.2) - Math.PI / 2;
-                        const speed = (state.baseSpeed + state.level * 0.3) * (state.mods.ballSpeedMul || 1);
+                        const speed = currentBallSpeed();
                         b.vx = Math.cos(angle) * speed;
                         b.vy = Math.sin(angle) * speed;
                         b.onPaddle = false;
                     }
                 }
             }
+        } else if (key === "pistol") {
+            state.mods.pistol = false;
+            state.shots = [];
         }
     }
 
@@ -589,6 +655,16 @@
         ctx.fillStyle = "rgba(255,255,255,0.35)";
         roundRect(ctx, pX + 4, pY + 2, padW - 8, 4, 2);
         ctx.fill();
+        if (state.mods.pistol) {
+            ctx.fillStyle = "#3da9fc";
+            roundRect(ctx, pX + 10, pY - 10, 10, 12, 3);
+            ctx.fill();
+            roundRect(ctx, pX + padW - 20, pY - 10, 10, 12, 3);
+            ctx.fill();
+            ctx.fillStyle = "#cfe8ff";
+            ctx.fillRect(pX + 13, pY - 18, 4, 10);
+            ctx.fillRect(pX + padW - 17, pY - 18, 4, 10);
+        }
         // A cat sitting on the paddle
         window.drawCanvasCat(ctx, pX + padW / 2, pY - 2, 24, {
             primary: "#f4a261", accent: "#e07a3a", eyeColor: "#2a8a3a",
@@ -611,6 +687,15 @@
                 accent: "#ce4257", eyeColor: "#1a1a1d",
                 ears: "normal"
             });
+        }
+
+        for (const shot of state.shots) {
+            ctx.fillStyle = "#cfe8ff";
+            roundRect(ctx, shot.x - PISTOL_SHOT_W / 2, shot.y - PISTOL_SHOT_H / 2, PISTOL_SHOT_W, PISTOL_SHOT_H, 3);
+            ctx.fill();
+            ctx.fillStyle = "rgba(61, 169, 252, 0.35)";
+            roundRect(ctx, shot.x - PISTOL_SHOT_W / 2 - 2, shot.y - PISTOL_SHOT_H / 2 - 4, PISTOL_SHOT_W + 4, PISTOL_SHOT_H + 8, 4);
+            ctx.fill();
         }
 
         // Power-ups (falling)

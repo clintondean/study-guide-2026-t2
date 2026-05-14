@@ -31,6 +31,8 @@
     let onExit, onHighScore, getHighScore = () => 0;
 
     let state, rafId, keys;
+    const WAVE_SPEED_STEP = 0.275;
+    const EDGE_SPEED_MULT = 1.06;
 
     const SESSION = (typeof window !== "undefined" && window.BreakSession) || {
         BREAK_MS: 5 * 60 * 1000, start() {}, end() {}, elapsed: () => 0
@@ -144,6 +146,7 @@
             fireCooldown: 0,
             fireRequest: false,
             lastShotAt: 0,
+            explosions: [],
             // Mother ship — random sweeps across the top of the screen for big bonus points
             motherShip: null,
             nextMotherShipAt: performance.now() + randMs(15000, 25000)
@@ -156,8 +159,8 @@
     }
 
     function waveSpeed(wave) {
-        // Wave 1 starts at 0.7, wave 2 at ~1.05, etc. Capped at 4 (max).
-        return Math.min(0.7 + (wave - 1) * 0.55, 4);
+        // Wave 1 starts at 0.7, then ramps more gently from there.
+        return Math.min(0.7 + (wave - 1) * WAVE_SPEED_STEP, 4);
     }
     function randMs(lo, hi) { return lo + Math.random() * (hi - lo); }
 
@@ -222,9 +225,9 @@
         if (edge) {
             state.alienDir *= -1;
             for (const a of state.aliens) if (a.alive) a.y += state.descendStep;
-            // Each edge bump bumps alien speed by ~12% — accelerates quickly
-            // when only a few aliens remain (classic Space Invaders panic).
-            state.alienSpeed = Math.min(state.alienSpeed * 1.12, 4.5);
+            // Each edge bump now only nudges speed up slightly so waves stay
+            // readable for longer.
+            state.alienSpeed = Math.min(state.alienSpeed * EDGE_SPEED_MULT, 4.5);
         }
 
         // Mother ship — random sweeps across the top for bonus points
@@ -295,19 +298,34 @@
             state.motherShipBonus.t += 16;
             if (state.motherShipBonus.t > 900) state.motherShipBonus = null;
         }
+        for (const boom of state.explosions) {
+            boom.t += 16;
+            for (const p of boom.particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.98;
+                p.vy = p.vy * 0.98 + 0.04;
+            }
+        }
+        state.explosions = state.explosions.filter(boom => boom.t < boom.life);
         state.bullets = state.bullets.filter(b => !b.dead);
 
         // Alien bullets vs player
+        let playerHit = false;
         for (const b of state.alienBullets) {
             if (b.x + 4 > state.player.x && b.x < state.player.x + PLAYER_W &&
                 b.y + 10 > state.player.y && b.y < state.player.y + PLAYER_H) {
                 b.dead = true;
+                createExplosion(state.player.x + PLAYER_W / 2, state.player.y + PLAYER_H / 2, ["#ffd166", "#ff7f51", "#ffffff"]);
                 state.lives--;
                 state.player.x = W / 2 - PLAYER_W / 2;
+                playerHit = true;
                 if (state.lives <= 0) endGame();
+                break;
             }
         }
         state.alienBullets = state.alienBullets.filter(b => !b.dead);
+        if (playerHit && state.gameOver) return;
 
         // Alien reaches player line
         if (state.aliens.some(a => a.alive && a.y + ALIEN_H >= PLAYER_Y - 8)) {
@@ -327,6 +345,24 @@
         }
 
         updateHud();
+    }
+
+    function createExplosion(x, y, palette) {
+        const colors = palette || ["#ffd166", "#ff7f51", "#ffffff"];
+        const particles = [];
+        for (let i = 0; i < 18; i++) {
+            const angle = (Math.PI * 2 * i) / 18 + Math.random() * 0.2;
+            const speed = 1.2 + Math.random() * 2.6;
+            particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 2 + Math.random() * 3,
+                color: colors[i % colors.length]
+            });
+        }
+        state.explosions.push({ t: 0, life: 420, particles });
     }
 
     function endGame() {
@@ -510,6 +546,19 @@
         ctx.fillStyle = "#ff7f51";
         for (const b of state.alienBullets) {
             ctx.fillRect(b.x, b.y, 4, 10);
+        }
+
+        for (const boom of state.explosions) {
+            const alpha = 1 - boom.t / boom.life;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, alpha);
+            for (const p of boom.particles) {
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
         }
 
         // Player saucer

@@ -118,7 +118,7 @@ render visual content as inline SVG. `Cats.tetrisFace(appearance)` and
 
 ### Persist exam answers via `examProgress`
 
-Practice-question answers go through `persistAnswerForExam(q, snapshot)`
+Practice-quiz answers go through `persistAnswerForExam(q, snapshot)`
 which writes to `state.subjects[id].examProgress[examId].answers[keyOf(q)]`.
 Mock exam timer state lives at `examProgress[mockId].timer`.
 
@@ -126,13 +126,19 @@ On re-launching a practice exam, previous answers preload **unlocked** so
 Harper can change them. On re-launching a mock, only resume if the previous
 attempt was unfinished — otherwise start fresh.
 
-### Generate practice exams; don't hand-write them
+### Generate practice quizzes; don't hand-write them
 
 Each subject defines `practiceTopics: []`. `generatePracticeExams()` in
 `app.js` runs at boot and produces a deterministic `practiceExams: []`. Each
 exam is 20 questions = 14 MCQ + 5 short + 1 long (constants
-`PRACTICE_MCQ`, `PRACTICE_SA`, `PRACTICE_LA`). Don't hand-author
+`PRACTICE_MCQ`, `PRACTICE_SA`, `PRACTICE_LA`). The default is 10 quizzes per
+topic, but a topic can override that with `setCount`. Don't hand-author
 `practiceExams` directly — the boot-generator overwrites them.
+
+When expanding generated practice-quiz counts, keep the change append-only.
+`bestScores` and `examProgress` are keyed by `examId`, so existing generated
+IDs must stay stable; add new higher-numbered sets via `setCount` instead of
+renaming or renumbering existing ones.
 
 ### Hand-curate mock exams to a strict 20+10+2 composition
 

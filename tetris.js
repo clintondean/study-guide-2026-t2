@@ -207,8 +207,8 @@ function getCatFaceSvg(key) {
     function dropSpeedMs() {
         // Speed ramps with each line cleared (gentle, persistent), with a small
         // per-level boost on top. Caps at ~100ms (10 drops/sec) — plenty fast.
-        const linesContribution = state.lines * 14;     // -14 ms per line
-        const levelContribution = (state.level - 1) * 18;
+        const linesContribution = state.lines * 3.5;    // -3.5 ms per line
+        const levelContribution = (state.level - 1) * 4.5;
         return Math.max(100, 700 - linesContribution - levelContribution);
     }
 

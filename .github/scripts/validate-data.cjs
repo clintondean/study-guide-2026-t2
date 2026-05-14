@@ -86,7 +86,8 @@ function generatePracticeExams(subjectId, subject) {
         const mcqPool = (topic.sourceTopics || []).flatMap(id => (mcqsByTopic[id] || []).map(q => q.id));
         const shortPool = (topic.sourceTopics || []).flatMap(id => (shortByTopic[id] || []).map(q => q.id));
         const longPool = (topic.sourceTopics || []).flatMap(id => (longByTopic[id] || []).map(q => q.id));
-        for (let n = 1; n <= PRACTICE_EXAMS_PER_TOPIC; n++) {
+        const topicExamCount = Math.max(1, Math.floor(topic.setCount || PRACTICE_EXAMS_PER_TOPIC));
+        for (let n = 1; n <= topicExamCount; n++) {
             const examId = `exam-${topic.id}-${n}`;
             const rng = _mulberry32(_hashStr(examId));
             const long = _pickN(longPool, PRACTICE_LA, rng);

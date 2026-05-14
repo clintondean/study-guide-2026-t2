@@ -5569,7 +5569,8 @@ window.SUBJECT_DATA["maths-core"] = {
             id: "core-review",
             name: "Year 7 Core Review",
             outcomes: "MA3-RN-01 · MA3-AR-01 · MA3-MR-01 · MA4-INT-C-01 · MA4-ANG-C-01 · MA4-FRC-C-01 · MAO-WM-01",
-            sourceTopics: ["integers-place-value", "integers-operations", "angle-basics", "angle-parallel", "fdp-conversions", "fdp-operations"]
+            sourceTopics: ["integers-place-value", "integers-operations", "angle-basics", "angle-parallel", "fdp-conversions", "fdp-operations"],
+            setCount: 30
         }
     ],
     practiceExams: [],

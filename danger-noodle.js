@@ -15,6 +15,7 @@
     const CRAZY_BURST_COUNT = 20;
     const BASE_STEP_MS = 175;
     const MIN_STEP_MS = 88;
+    const MAX_TURN_QUEUE = 2;
     const BONUS_TYPES = ["super", "turbo", "poison", "sloMo", "crazy"];
     const DIRS = {
         up: { x: 0, y: -1, name: "up" },
@@ -177,7 +178,7 @@
         return {
             snake,
             dir: DIRS.right,
-            queuedDir: null,
+            turnQueue: [],
             fruits: [],
             burstFruits: [],
             score: 0,
@@ -241,7 +242,7 @@
                 <button type="button" data-dir="down">↓</button>
                 <button type="button" data-dir="right">→</button>
             </div>
-            <p class="break-help">Arrow keys or touch buttons to steer. Press <kbd>P</kbd> to pause. Wall hit or self-bonk ends the run.</p>
+            <p class="break-help">Arrow keys or touch buttons to steer. Quick two-turn combos buffer cleanly, and <kbd>P</kbd> pauses the noodle.</p>
         `;
         canvas = document.getElementById("danger-noodle-canvas");
         ctx = canvas.getContext("2d");
@@ -314,9 +315,11 @@
     function queueDirection(dirName) {
         if (!state || state.paused || state.gameOver) return;
         const dir = DIRS[dirName];
-        if (!dir || state.queuedDir) return;
-        if (isOpposite(dir, state.dir)) return;
-        state.queuedDir = dir;
+        if (!dir || state.turnQueue.length >= MAX_TURN_QUEUE) return;
+        const plannedDir = state.turnQueue.length ? state.turnQueue[state.turnQueue.length - 1] : state.dir;
+        if (dir.name === plannedDir.name) return;
+        if (isOpposite(dir, plannedDir)) return;
+        state.turnQueue.push(dir);
     }
 
     function isOpposite(a, b) {
@@ -364,9 +367,8 @@
     }
 
     function advanceSnake(now) {
-        if (state.queuedDir) {
-            state.dir = state.queuedDir;
-            state.queuedDir = null;
+        if (state.turnQueue.length) {
+            state.dir = state.turnQueue.shift();
         }
         const head = state.snake[0];
         const next = { x: head.x + state.dir.x, y: head.y + state.dir.y };

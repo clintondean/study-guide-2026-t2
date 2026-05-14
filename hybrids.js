@@ -3,12 +3,12 @@
 
     const RARITY_ORDER = ["common", "uncommon", "rare", "ultra-rare", "legendary"];
     const CAT_EAR_PRIORITY = ["normal", "small", "big", "folded", "curl", "tufted"];
-    const DISTINCTIVE_EAR_KINDS = new Set(["rabbit", "fox", "fennec", "alpaca", "deer", "koala", "panda", "cockatiel", "frog"]);
-    const DISTINCTIVE_TAIL_KINDS = new Set(["rabbit", "fox", "fennec", "red-panda", "raccoon", "seal", "otter", "ferret"]);
-    const MARKING_KINDS = new Set(["red-panda", "raccoon", "panda", "deer", "hedgehog", "axolotl", "cockatiel"]);
-    const HORN_KINDS = new Set(["deer"]);
-    const NO_WHISKER_KINDS = new Set(["duck", "cockatiel", "seal", "frog", "axolotl", "turtle"]);
-    const BEAK_KINDS = new Set(["duck", "cockatiel"]);
+    const DISTINCTIVE_EAR_KINDS = new Set(["rabbit", "fox", "fennec", "alpaca", "deer", "koala", "panda", "cockatiel", "frog", "squirrel", "mouse", "hamster", "piglet", "sheep", "goat", "owl", "bee", "bat", "elephant", "sloth", "chameleon", "lemur"]);
+    const DISTINCTIVE_TAIL_KINDS = new Set(["rabbit", "fox", "fennec", "red-panda", "raccoon", "seal", "otter", "ferret", "squirrel", "mouse", "hamster", "beaver", "piglet", "sheep", "goat", "owl", "penguin", "bee", "bat", "dolphin", "elephant", "sloth", "chameleon", "lemur"]);
+    const MARKING_KINDS = new Set(["red-panda", "raccoon", "panda", "deer", "hedgehog", "axolotl", "cockatiel", "owl", "chameleon", "lemur"]);
+    const HORN_KINDS = new Set(["deer", "goat"]);
+    const NO_WHISKER_KINDS = new Set(["duck", "cockatiel", "seal", "frog", "axolotl", "turtle", "bee", "owl", "penguin", "dolphin", "elephant", "chameleon", "bat", "piglet", "sheep", "goat", "sloth", "lemur"]);
+    const BEAK_KINDS = new Set(["duck", "cockatiel", "owl", "penguin"]);
     let clipCounter = 0;
 
     function uid(prefix) {

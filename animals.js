@@ -41,6 +41,13 @@
             "A calm little step still counts."
         ]
     };
+    const NO_WHISKER_KINDS = new Set([
+        "duck", "cockatiel", "seal", "frog", "axolotl", "turtle",
+        "bee", "owl", "penguin", "dolphin", "elephant", "chameleon",
+        "bat", "piglet", "sheep", "goat", "sloth", "lemur"
+    ]);
+    const BEAK_KINDS = new Set(["duck", "cockatiel", "owl", "penguin"]);
+    const TALL_FACE_KINDS = new Set(["alpaca", "elephant"]);
 
     function pick(arr) {
         return arr[Math.floor(Math.random() * arr.length)];
@@ -143,12 +150,18 @@
         `;
     }
 
-    function mouthFor(expression, cx, cy, isBeak) {
+    function mouthFor(expression, kind, cx, cy, isBeak) {
         if (isBeak) {
             if (expression === "thinking") {
                 return `<path d="M ${cx - 6} ${cy} L ${cx + 8} ${cy + 3} L ${cx - 4} ${cy + 10} z" fill="#f0a500"/>`;
             }
             return `<path d="M ${cx - 8} ${cy} L ${cx + 10} ${cy + 2} L ${cx - 6} ${cy + 12} z" fill="#f0a500"/>`;
+        }
+        if (kind === "elephant") {
+            return `<path d="M ${cx - 10} ${cy + 28} q 10 8 20 0" stroke="#49352a" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+        }
+        if (kind === "dolphin") {
+            return `<path d="M ${cx + 4} ${cy + 10} q 8 6 16 0" stroke="#49352a" stroke-width="3" fill="none" stroke-linecap="round"/>`;
         }
         if (expression === "napping") return "";
         if (expression === "thinking") {
@@ -175,7 +188,7 @@
     }
 
     function whiskersFor(kind, cx, cy) {
-        if (kind === "duck" || kind === "cockatiel" || kind === "seal" || kind === "frog" || kind === "axolotl" || kind === "turtle") return "";
+        if (NO_WHISKER_KINDS.has(kind)) return "";
         return `
             <path d="M ${cx - 18} ${cy + 10} l -24 -4" stroke="#5b4333" stroke-width="2.5" stroke-linecap="round"/>
             <path d="M ${cx - 18} ${cy + 16} l -22 6" stroke="#5b4333" stroke-width="2.5" stroke-linecap="round"/>
@@ -217,11 +230,100 @@
                 <circle cx="76" cy="90" r="15" fill="${a.secondary}"/>
                 <circle cx="164" cy="90" r="15" fill="${a.secondary}"/>
             `;
+        case "squirrel":
+            return `
+                <path d="M 72 92 L 88 46 L 112 96 Z" fill="${a.primary}"/>
+                <path d="M 128 96 L 152 46 L 168 92 Z" fill="${a.primary}"/>
+                <path d="M 88 86 q 2 -22 16 -28" stroke="${a.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/>
+                <path d="M 136 58 q 14 6 16 28" stroke="${a.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/>
+            `;
+        case "mouse":
+            return `
+                <circle cx="82" cy="86" r="22" fill="${a.primary}"/>
+                <circle cx="158" cy="86" r="22" fill="${a.primary}"/>
+                <circle cx="82" cy="86" r="12" fill="${a.secondary}"/>
+                <circle cx="158" cy="86" r="12" fill="${a.secondary}"/>
+            `;
+        case "hamster":
+            return `
+                <circle cx="88" cy="90" r="18" fill="${a.primary}"/>
+                <circle cx="152" cy="90" r="18" fill="${a.primary}"/>
+                <circle cx="88" cy="90" r="9" fill="${a.secondary}"/>
+                <circle cx="152" cy="90" r="9" fill="${a.secondary}"/>
+            `;
+        case "piglet":
+            return `
+                <path d="M 74 96 q 12 -36 34 -26 q -8 24 -4 34 q -18 2 -30 -8 z" fill="${a.primary}"/>
+                <path d="M 166 96 q -12 -36 -34 -26 q 8 24 4 34 q 18 2 30 -8 z" fill="${a.primary}"/>
+                <path d="M 90 98 q 2 -14 12 -18" stroke="${a.secondary}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M 150 80 q -10 4 -12 18" stroke="${a.secondary}" stroke-width="6" fill="none" stroke-linecap="round"/>
+            `;
+        case "sheep":
+            return `
+                <circle cx="86" cy="92" r="18" fill="${a.primary}"/>
+                <circle cx="154" cy="92" r="18" fill="${a.primary}"/>
+                <circle cx="86" cy="92" r="9" fill="${a.secondary}"/>
+                <circle cx="154" cy="92" r="9" fill="${a.secondary}"/>
+            `;
+        case "goat":
+            return `
+                <ellipse cx="86" cy="92" rx="14" ry="22" fill="${a.primary}" transform="rotate(-12 86 92)"/>
+                <ellipse cx="154" cy="92" rx="14" ry="22" fill="${a.primary}" transform="rotate(12 154 92)"/>
+                <ellipse cx="88" cy="96" rx="6" ry="10" fill="${a.secondary}" transform="rotate(-12 88 96)"/>
+                <ellipse cx="152" cy="96" rx="6" ry="10" fill="${a.secondary}" transform="rotate(12 152 96)"/>
+            `;
         case "cockatiel":
             return `
                 <path d="M 110 54 q -12 -34 2 -38 q 8 7 8 28 z" fill="${a.accent}"/>
                 <path d="M 120 48 q -2 -40 14 -42 q 7 10 0 30 z" fill="${a.accent}"/>
                 <path d="M 130 54 q 14 -34 22 -26 q 5 14 -10 28 z" fill="${a.accent}"/>
+            `;
+        case "owl":
+            return `
+                <path d="M 90 90 q -8 -28 8 -42 q 12 16 6 38 z" fill="${a.primary}"/>
+                <path d="M 150 86 q 6 -24 -6 -38 q -16 14 -8 42 z" fill="${a.primary}"/>
+                <path d="M 98 90 q 0 -14 8 -20" stroke="${a.secondary}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M 142 70 q 8 6 8 20" stroke="${a.secondary}" stroke-width="6" fill="none" stroke-linecap="round"/>
+            `;
+        case "bee":
+            return `
+                <path d="M 96 84 q -10 -22 -2 -34" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <path d="M 144 84 q 10 -22 2 -34" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <circle cx="94" cy="48" r="7" fill="${a.accent}"/>
+                <circle cx="146" cy="48" r="7" fill="${a.accent}"/>
+            `;
+        case "bat":
+            return `
+                <path d="M 70 102 q 10 -42 38 -48 q -2 24 8 44 z" fill="${a.primary}"/>
+                <path d="M 170 102 q -10 -42 -38 -48 q 2 24 -8 44 z" fill="${a.primary}"/>
+                <path d="M 92 96 q 2 -20 14 -26" stroke="${a.secondary}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <path d="M 148 70 q 12 6 14 26" stroke="${a.secondary}" stroke-width="5" fill="none" stroke-linecap="round"/>
+            `;
+        case "elephant":
+            return `
+                <ellipse cx="72" cy="112" rx="28" ry="34" fill="${a.primary}"/>
+                <ellipse cx="168" cy="112" rx="28" ry="34" fill="${a.primary}"/>
+                <ellipse cx="72" cy="112" rx="18" ry="22" fill="${a.secondary}" opacity="0.82"/>
+                <ellipse cx="168" cy="112" rx="18" ry="22" fill="${a.secondary}" opacity="0.82"/>
+            `;
+        case "sloth":
+            return `
+                <circle cx="86" cy="94" r="16" fill="${a.primary}"/>
+                <circle cx="154" cy="94" r="16" fill="${a.primary}"/>
+                <circle cx="86" cy="94" r="8" fill="${a.secondary}" opacity="0.8"/>
+                <circle cx="154" cy="94" r="8" fill="${a.secondary}" opacity="0.8"/>
+            `;
+        case "chameleon":
+            return `
+                <path d="M 88 90 q 0 -24 18 -28 q 8 20 -4 34 z" fill="${a.primary}"/>
+                <path d="M 152 90 q 0 -24 -18 -28 q -8 20 4 34 z" fill="${a.primary}"/>
+            `;
+        case "lemur":
+            return `
+                <circle cx="82" cy="90" r="20" fill="${a.primary}"/>
+                <circle cx="158" cy="90" r="20" fill="${a.primary}"/>
+                <circle cx="82" cy="90" r="10" fill="${a.secondary}"/>
+                <circle cx="158" cy="90" r="10" fill="${a.secondary}"/>
             `;
         case "frog":
             return `
@@ -248,17 +350,96 @@
         case "red-panda":
         case "raccoon":
             return `<path d="M 180 214 q 54 8 42 46 q -18 22 -54 2 q 18 -12 12 -48 z" fill="${a.primary}"/><path d="M 190 224 q 20 4 26 16" stroke="${a.accent}" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M 184 244 q 18 4 24 16" stroke="${a.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/>`;
+        case "squirrel":
+            return `<path d="M 178 220 q 48 -36 34 -80 q -12 -28 -38 -10 q 12 16 4 38 q 24 2 22 30 q -2 18 -22 22 z" fill="${a.primary}"/><path d="M 196 170 q 14 -6 20 -18" stroke="${a.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/>`;
+        case "mouse":
+            return `<path d="M 178 230 q 54 18 42 48" stroke="${a.primary}" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="218" cy="280" r="7" fill="${a.secondary}"/>`;
+        case "hamster":
+            return `<circle cx="68" cy="222" r="16" fill="${a.secondary}" opacity="0.8"/>`;
+        case "beaver":
+            return `<path d="M 180 232 q 38 4 46 22 q -8 16 -36 20 q -26 -2 -24 -22 q 0 -16 14 -20 z" fill="${a.accent}"/>`;
+        case "piglet":
+            return `<path d="M 182 238 q 18 -8 24 8 q -10 10 -4 20" stroke="${a.primary}" stroke-width="7" fill="none" stroke-linecap="round"/>`;
+        case "sheep":
+            return `<circle cx="64" cy="218" r="16" fill="${a.secondary}"/>`;
+        case "goat":
+            return `<path d="M 178 236 q 18 -2 26 10 q -10 10 -2 18" stroke="${a.primary}" stroke-width="7" fill="none" stroke-linecap="round"/>`;
         case "seal":
             return `<path d="M 178 234 q 44 10 34 34 q -14 16 -42 -2 q 14 -12 8 -32 z" fill="${a.primary}"/>`;
         case "otter":
         case "ferret":
             return `<path d="M 176 230 q 60 0 48 28 q -10 14 -42 6 q 12 -12 6 -34 z" fill="${a.primary}"/>`;
+        case "owl":
+            return `<path d="M 168 226 q 18 2 24 18 q -12 6 -22 18 q -8 -12 -8 -22 q 0 -8 6 -14 z" fill="${a.primary}"/>`;
+        case "penguin":
+            return `<path d="M 176 234 q 18 0 18 14 q 0 10 -18 14 q -6 -12 0 -28 z" fill="${a.primary}"/>`;
+        case "bee":
+            return `<path d="M 178 236 q 16 -4 18 10 q -2 10 -18 12 q -2 -8 0 -22 z" fill="${a.accent}"/>`;
+        case "bat":
+            return `<path d="M 176 236 q 18 -4 24 10 q -8 10 -4 20 q -18 0 -26 -14 q 0 -8 6 -16 z" fill="${a.primary}"/>`;
+        case "dolphin":
+            return `<path d="M 176 230 q 24 -12 38 -2 q -2 18 -18 26 q -8 -8 -20 -6 z" fill="${a.primary}"/><path d="M 214 226 l 14 -10 l -2 18 l 16 6 l -18 4 l -10 14 l -6 -16 l -18 -4 l 18 -4 z" fill="${a.secondary}"/>`;
+        case "elephant":
+            return `<path d="M 178 236 q 20 0 22 16 q -10 12 -4 22" stroke="${a.primary}" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M 180 236 q 18 2 22 16" stroke="${a.secondary}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+        case "sloth":
+            return `<path d="M 178 236 q 16 4 14 18 q -6 10 -20 6 q -2 -12 6 -24 z" fill="${a.primary}"/>`;
+        case "chameleon":
+            return `<path d="M 188 236 q 20 0 20 18 q 0 16 -18 16 q 14 -10 6 -20 q -12 0 -8 -14 z" fill="none" stroke="${a.primary}" stroke-width="7" stroke-linecap="round"/>`;
+        case "lemur":
+            return `<path d="M 180 222 q 50 6 42 42 q -16 16 -46 0 q 16 -10 12 -42 z" fill="${a.primary}"/><path d="M 188 228 q 12 4 18 14" stroke="${a.secondary}" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M 184 248 q 12 4 18 14" stroke="${a.accent}" stroke-width="8" fill="none" stroke-linecap="round"/>`;
         default:
             return `<path d="M 176 220 q 48 4 40 32 q -12 16 -44 2 q 14 -10 10 -34 z" fill="${a.primary}"/>`;
         }
     }
 
     function bodyFor(kind, a) {
+        if (kind === "hamster") {
+            return `
+                <ellipse cx="120" cy="220" rx="64" ry="48" fill="${a.primary}"/>
+                <ellipse cx="120" cy="230" rx="34" ry="22" fill="${a.secondary}" opacity="0.92"/>
+                <ellipse cx="88" cy="254" rx="12" ry="12" fill="${a.primary}"/>
+                <ellipse cx="152" cy="254" rx="12" ry="12" fill="${a.primary}"/>
+            `;
+        }
+        if (kind === "beaver") {
+            return `
+                <ellipse cx="118" cy="222" rx="66" ry="44" fill="${a.primary}"/>
+                <ellipse cx="118" cy="232" rx="34" ry="18" fill="${a.secondary}" opacity="0.9"/>
+                <rect x="82" y="248" width="14" height="24" rx="7" fill="${a.primary}"/>
+                <rect x="142" y="248" width="14" height="24" rx="7" fill="${a.primary}"/>
+            `;
+        }
+        if (kind === "piglet") {
+            return `
+                <ellipse cx="120" cy="220" rx="60" ry="44" fill="${a.primary}"/>
+                <ellipse cx="120" cy="228" rx="26" ry="14" fill="${a.secondary}" opacity="0.9"/>
+                <rect x="86" y="248" width="12" height="28" rx="4" fill="${a.primary}"/>
+                <rect x="106" y="248" width="12" height="28" rx="4" fill="${a.primary}"/>
+                <rect x="126" y="248" width="12" height="28" rx="4" fill="${a.primary}"/>
+                <rect x="146" y="248" width="12" height="28" rx="4" fill="${a.primary}"/>
+            `;
+        }
+        if (kind === "sheep") {
+            return `
+                <circle cx="90" cy="222" r="28" fill="${a.primary}"/>
+                <circle cx="118" cy="210" r="34" fill="${a.primary}"/>
+                <circle cx="148" cy="222" r="28" fill="${a.primary}"/>
+                <ellipse cx="120" cy="230" rx="30" ry="16" fill="${a.secondary}" opacity="0.86"/>
+                <rect x="90" y="252" width="10" height="24" rx="5" fill="${a.accent}"/>
+                <rect x="140" y="252" width="10" height="24" rx="5" fill="${a.accent}"/>
+            `;
+        }
+        if (kind === "goat") {
+            return `
+                <ellipse cx="120" cy="218" rx="60" ry="42" fill="${a.primary}"/>
+                <ellipse cx="120" cy="228" rx="28" ry="16" fill="${a.secondary}" opacity="0.88"/>
+                <rect x="86" y="246" width="12" height="30" rx="5" fill="${a.primary}"/>
+                <rect x="106" y="246" width="12" height="30" rx="5" fill="${a.primary}"/>
+                <rect x="126" y="246" width="12" height="30" rx="5" fill="${a.primary}"/>
+                <rect x="146" y="246" width="12" height="30" rx="5" fill="${a.primary}"/>
+                <path d="M 118 228 q 2 18 16 24" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+            `;
+        }
         if (kind === "seal") {
             return `
                 <ellipse cx="120" cy="222" rx="66" ry="42" fill="${a.primary}"/>
@@ -305,6 +486,82 @@
                 <path d="M 154 220 q -18 18 0 34" stroke="${a.accent}" stroke-width="8" fill="none" stroke-linecap="round"/>
             `;
         }
+        if (kind === "owl") {
+            return `
+                <ellipse cx="120" cy="220" rx="54" ry="50" fill="${a.primary}"/>
+                <ellipse cx="120" cy="230" rx="26" ry="20" fill="${a.secondary}" opacity="0.9"/>
+                <path d="M 84 212 q 18 16 10 38" stroke="${a.accent}" stroke-width="10" fill="none" stroke-linecap="round"/>
+                <path d="M 156 212 q -18 16 -10 38" stroke="${a.accent}" stroke-width="10" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "penguin") {
+            return `
+                <ellipse cx="120" cy="220" rx="52" ry="54" fill="${a.primary}"/>
+                <ellipse cx="120" cy="228" rx="24" ry="30" fill="${a.secondary}" opacity="0.96"/>
+                <path d="M 90 214 q 14 18 8 40" stroke="${a.accent}" stroke-width="9" fill="none" stroke-linecap="round"/>
+                <path d="M 150 214 q -14 18 -8 40" stroke="${a.accent}" stroke-width="9" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "bee") {
+            return `
+                <ellipse cx="120" cy="220" rx="48" ry="38" fill="${a.primary}"/>
+                <ellipse cx="92" cy="192" rx="18" ry="12" fill="${a.secondary}" opacity="0.45"/>
+                <ellipse cx="148" cy="192" rx="18" ry="12" fill="${a.secondary}" opacity="0.45"/>
+                <path d="M 82 210 h 76" stroke="${a.accent}" stroke-width="10" stroke-linecap="round"/>
+                <path d="M 86 228 h 68" stroke="${a.accent}" stroke-width="10" stroke-linecap="round"/>
+                <path d="M 94 246 h 52" stroke="${a.accent}" stroke-width="10" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "bat") {
+            return `
+                <ellipse cx="120" cy="228" rx="36" ry="42" fill="${a.primary}"/>
+                <path d="M 84 218 q -34 -22 -46 10 q 18 14 26 34 q 22 -10 34 -6 z" fill="${a.accent}" opacity="0.95"/>
+                <path d="M 156 218 q 34 -22 46 10 q -18 14 -26 34 q -22 -10 -34 -6 z" fill="${a.accent}" opacity="0.95"/>
+                <ellipse cx="120" cy="236" rx="18" ry="12" fill="${a.secondary}" opacity="0.92"/>
+            `;
+        }
+        if (kind === "dolphin") {
+            return `
+                <ellipse cx="120" cy="220" rx="54" ry="44" fill="${a.primary}"/>
+                <ellipse cx="120" cy="228" rx="24" ry="16" fill="${a.secondary}" opacity="0.88"/>
+                <path d="M 90 224 q -18 8 -24 26" stroke="${a.accent}" stroke-width="8" fill="none" stroke-linecap="round"/>
+                <path d="M 150 224 q 18 8 24 26" stroke="${a.accent}" stroke-width="8" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "elephant") {
+            return `
+                <ellipse cx="120" cy="220" rx="64" ry="46" fill="${a.primary}"/>
+                <ellipse cx="120" cy="230" rx="30" ry="18" fill="${a.secondary}" opacity="0.86"/>
+                <rect x="84" y="248" width="14" height="30" rx="6" fill="${a.primary}"/>
+                <rect x="106" y="248" width="14" height="30" rx="6" fill="${a.primary}"/>
+                <rect x="126" y="248" width="14" height="30" rx="6" fill="${a.primary}"/>
+                <rect x="148" y="248" width="14" height="30" rx="6" fill="${a.primary}"/>
+            `;
+        }
+        if (kind === "sloth") {
+            return `
+                <ellipse cx="120" cy="220" rx="52" ry="46" fill="${a.primary}"/>
+                <ellipse cx="120" cy="230" rx="26" ry="18" fill="${a.secondary}" opacity="0.88"/>
+                <path d="M 86 194 q -18 30 -6 70" stroke="${a.accent}" stroke-width="10" fill="none" stroke-linecap="round"/>
+                <path d="M 154 194 q 18 30 6 70" stroke="${a.accent}" stroke-width="10" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "chameleon") {
+            return `
+                <ellipse cx="120" cy="220" rx="56" ry="40" fill="${a.primary}"/>
+                <ellipse cx="120" cy="228" rx="24" ry="14" fill="${a.secondary}" opacity="0.86"/>
+                <path d="M 92 238 q -14 14 -10 28" stroke="${a.accent}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M 148 238 q 14 14 10 28" stroke="${a.accent}" stroke-width="6" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "lemur") {
+            return `
+                <ellipse cx="120" cy="220" rx="54" ry="42" fill="${a.primary}"/>
+                <ellipse cx="120" cy="228" rx="26" ry="16" fill="${a.secondary}" opacity="0.9"/>
+                <ellipse cx="92" cy="254" rx="12" ry="14" fill="${a.primary}"/>
+                <ellipse cx="148" cy="254" rx="12" ry="14" fill="${a.primary}"/>
+            `;
+        }
         return `
             <ellipse cx="120" cy="220" rx="58" ry="44" fill="${a.primary}"/>
             <ellipse cx="120" cy="228" rx="30" ry="18" fill="${a.secondary}" opacity="0.9"/>
@@ -314,11 +571,49 @@
     }
 
     function headFor(kind, a) {
+        if (kind === "hamster") {
+            return `
+                <circle cx="120" cy="138" r="52" fill="${a.primary}"/>
+                <ellipse cx="120" cy="156" rx="28" ry="20" fill="${a.secondary}"/>
+            `;
+        }
+        if (kind === "piglet") {
+            return `
+                <circle cx="120" cy="138" r="50" fill="${a.primary}"/>
+                <ellipse cx="120" cy="160" rx="26" ry="18" fill="${a.secondary}"/>
+            `;
+        }
+        if (kind === "sheep") {
+            return `
+                <circle cx="92" cy="132" r="18" fill="${a.primary}"/>
+                <circle cx="120" cy="124" r="24" fill="${a.primary}"/>
+                <circle cx="148" cy="132" r="18" fill="${a.primary}"/>
+                <ellipse cx="120" cy="154" rx="24" ry="18" fill="${a.secondary}"/>
+            `;
+        }
         if (kind === "alpaca") {
             return `
                 <ellipse cx="120" cy="134" rx="46" ry="40" fill="${a.primary}"/>
                 <ellipse cx="120" cy="152" rx="24" ry="18" fill="${a.secondary}"/>
                 <ellipse cx="120" cy="92" rx="34" ry="20" fill="${a.secondary}" opacity="0.85"/>
+            `;
+        }
+        if (kind === "owl") {
+            return `
+                <circle cx="120" cy="136" r="50" fill="${a.primary}"/>
+                <ellipse cx="120" cy="146" rx="30" ry="26" fill="${a.secondary}" opacity="0.94"/>
+            `;
+        }
+        if (kind === "penguin") {
+            return `
+                <ellipse cx="120" cy="138" rx="44" ry="48" fill="${a.primary}"/>
+                <ellipse cx="120" cy="146" rx="22" ry="24" fill="${a.secondary}" opacity="0.96"/>
+            `;
+        }
+        if (kind === "bee") {
+            return `
+                <circle cx="120" cy="138" r="42" fill="${a.primary}"/>
+                <ellipse cx="120" cy="152" rx="18" ry="12" fill="${a.secondary}" opacity="0.78"/>
             `;
         }
         if (kind === "frog") {
@@ -327,10 +622,40 @@
                 <ellipse cx="120" cy="154" rx="26" ry="16" fill="${a.secondary}" opacity="0.8"/>
             `;
         }
+        if (kind === "dolphin") {
+            return `
+                <ellipse cx="120" cy="138" rx="46" ry="38" fill="${a.primary}"/>
+                <path d="M 112 152 q 18 -6 34 8 q -18 8 -36 2 z" fill="${a.secondary}" opacity="0.85"/>
+            `;
+        }
+        if (kind === "elephant") {
+            return `
+                <circle cx="120" cy="138" r="52" fill="${a.primary}"/>
+                <ellipse cx="120" cy="154" rx="24" ry="16" fill="${a.secondary}" opacity="0.84"/>
+            `;
+        }
         if (kind === "seal") {
             return `
                 <ellipse cx="120" cy="138" rx="48" ry="38" fill="${a.primary}"/>
                 <ellipse cx="120" cy="156" rx="24" ry="16" fill="${a.secondary}" opacity="0.9"/>
+            `;
+        }
+        if (kind === "sloth") {
+            return `
+                <circle cx="120" cy="138" r="48" fill="${a.primary}"/>
+                <ellipse cx="120" cy="152" rx="28" ry="22" fill="${a.secondary}" opacity="0.9"/>
+            `;
+        }
+        if (kind === "chameleon") {
+            return `
+                <ellipse cx="120" cy="138" rx="48" ry="34" fill="${a.primary}"/>
+                <ellipse cx="124" cy="154" rx="22" ry="14" fill="${a.secondary}" opacity="0.82"/>
+            `;
+        }
+        if (kind === "lemur") {
+            return `
+                <circle cx="120" cy="136" r="48" fill="${a.primary}"/>
+                <ellipse cx="120" cy="152" rx="24" ry="18" fill="${a.secondary}" opacity="0.92"/>
             `;
         }
         return `
@@ -366,6 +691,34 @@
             return `
                 <path d="M 62 174 q 58 -70 116 0" fill="${a.accent}"/>
             `;
+        case "chipmunk":
+            return `
+                <path d="M 96 120 q 12 32 0 84" stroke="${a.accent}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M 120 116 q 10 34 0 92" stroke="${a.secondary}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <path d="M 144 120 q -12 32 0 84" stroke="${a.accent}" stroke-width="6" fill="none" stroke-linecap="round"/>
+            `;
+        case "cow":
+            return `
+                <path d="M 90 176 q 20 -18 38 4 q -8 18 -26 16 q -16 -4 -12 -20 z" fill="${a.accent}" opacity="0.8"/>
+                <path d="M 132 206 q 16 -12 28 6 q -8 18 -24 12 q -12 -6 -4 -18 z" fill="${a.accent}" opacity="0.8"/>
+            `;
+        case "owl":
+            return `
+                <path d="M 98 172 q 22 12 44 0" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <path d="M 100 190 q 20 8 40 0" stroke="${a.accent}" stroke-width="4" fill="none" stroke-linecap="round"/>
+            `;
+        case "puffin":
+            return `
+                <path d="M 104 160 q 16 12 32 0" stroke="${a.accent}" stroke-width="7" fill="none" stroke-linecap="round"/>
+                <circle cx="96" cy="148" r="5" fill="${a.secondary}"/>
+                <circle cx="144" cy="148" r="5" fill="${a.secondary}"/>
+            `;
+        case "walrus":
+            return `
+                <path d="M 112 164 q -4 20 -10 34" stroke="${a.secondary}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M 128 164 q 4 20 10 34" stroke="${a.secondary}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M 102 170 q 18 8 36 0" stroke="${a.accent}" stroke-width="4" fill="none" stroke-linecap="round"/>
+            `;
         case "axolotl":
             return `
                 <path d="M 70 134 q -18 -10 -22 -28" stroke="${a.accent}" stroke-width="7" fill="none" stroke-linecap="round"/>
@@ -379,12 +732,39 @@
                 <circle cx="136" cy="158" r="7" fill="#ffb5a7"/>
                 <path d="M 84 206 q 36 16 72 0" stroke="${a.accent}" stroke-width="7" fill="none" stroke-linecap="round"/>
             `;
+        case "chameleon":
+            return `
+                <circle cx="92" cy="186" r="6" fill="${a.secondary}" opacity="0.82"/>
+                <circle cx="112" cy="202" r="5" fill="${a.secondary}" opacity="0.76"/>
+                <circle cx="140" cy="188" r="6" fill="${a.secondary}" opacity="0.82"/>
+            `;
+        case "lemur":
+            return `
+                <ellipse cx="96" cy="140" rx="14" ry="18" fill="${a.accent}" opacity="0.72"/>
+                <ellipse cx="144" cy="140" rx="14" ry="18" fill="${a.accent}" opacity="0.72"/>
+            `;
+        case "monkey":
+            return `
+                <ellipse cx="120" cy="152" rx="30" ry="18" fill="${a.secondary}" opacity="0.62"/>
+            `;
         default:
             return "";
         }
     }
 
     function hornsFor(kind, a) {
+        if (kind === "goat") {
+            return `
+                <path d="M 94 92 q -10 -24 -2 -38 q -24 8 -18 28" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <path d="M 146 92 q 10 -24 2 -38 q 24 8 18 28" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+            `;
+        }
+        if (kind === "cow") {
+            return `
+                <path d="M 92 100 q -18 -10 -18 -24 q 16 -2 26 10" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                <path d="M 148 100 q 18 -10 18 -24 q -16 -2 -26 10" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
+            `;
+        }
         if (kind !== "deer") return "";
         return `
             <path d="M 96 92 q -8 -24 -18 -26 q 2 16 -8 24" stroke="${a.accent}" stroke-width="5" fill="none" stroke-linecap="round"/>
@@ -393,7 +773,22 @@
     }
 
     function noseFor(kind, a) {
-        if (kind === "duck" || kind === "cockatiel") return "";
+        if (BEAK_KINDS.has(kind)) return "";
+        if (kind === "piglet") {
+            return `
+                <ellipse cx="120" cy="160" rx="14" ry="10" fill="${a.accent}"/>
+                <circle cx="114" cy="160" r="2" fill="#6b3a33"/>
+                <circle cx="126" cy="160" r="2" fill="#6b3a33"/>
+            `;
+        }
+        if (kind === "elephant") {
+            return `
+                <path d="M 120 150 q -6 18 0 38 q 8 20 -2 30" stroke="${a.accent}" stroke-width="12" fill="none" stroke-linecap="round"/>
+                <circle cx="116" cy="218" r="2.5" fill="#5b4333"/>
+                <circle cx="124" cy="218" r="2.5" fill="#5b4333"/>
+            `;
+        }
+        if (kind === "dolphin") return `<circle cx="142" cy="154" r="3" fill="${a.accent}"/>`;
         if (kind === "frog") return `<ellipse cx="120" cy="154" rx="8" ry="6" fill="${a.accent}"/>`;
         return `<ellipse cx="120" cy="154" rx="8" ry="6" fill="${a.accent}"/>`;
     }
@@ -419,8 +814,8 @@
         const noseKind = a.noseKind || headKind;
         const mouthKind = a.mouthKind || noseKind;
         const compact = !!opts.compact;
-        const faceY = headKind === "alpaca" ? 142 : 144;
-        const isBeak = mouthKind === "duck" || mouthKind === "cockatiel";
+        const faceY = TALL_FACE_KINDS.has(headKind) ? 142 : 144;
+        const isBeak = BEAK_KINDS.has(mouthKind);
         const viewBox = compact ? "0 0 240 280" : "0 0 240 280";
         return `
             <svg viewBox="${viewBox}" class="cat-svg animal-svg animal-${kind}" role="img" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -433,7 +828,7 @@
                 ${eyesFor(expression, a.eyeColor, 120, faceY, compact)}
                 ${noseFor(noseKind, a)}
                 ${whiskersFor(whiskerKind, 120, faceY + 6)}
-                ${mouthFor(expression, 120, faceY + 6, isBeak)}
+                ${mouthFor(expression, mouthKind, 120, faceY + 6, isBeak)}
                 ${blushFor(expression, 120, faceY + 2)}
             </svg>
         `;
@@ -806,6 +1201,609 @@
             backstory: "Was fostered with a tangle of toy tunnels and still expects every room to contain at least one adventure route."
         }
     ];
+
+    PETS.push(
+        {
+            id: "acorn-squirrel",
+            species: "Acorn Squirrel",
+            habitat: "Hazelnut Grove",
+            defaultName: "Nibbles",
+            altNames: ["Hazel", "Twitch", "Pip", "Nutmeg"],
+            rarity: "common",
+            appearance: { kind: "squirrel", primary: "#c9874f", secondary: "#ffe2bf", accent: "#7b4d2d", eyeColor: "#342116" },
+            archetype: "Twig Acrobat",
+            traits: ["Quick", "Chatty", "Bright"],
+            stats: { cuddliness: 6, playfulness: 9, cleverness: 8, mischief: 7, talk: 7 },
+            phrases: { pet: ["Your hands are nice and warm.", "Tiny squirrel snuggle achieved."], play: ["Branch race!", "I can zig-zag around anything."], treat: ["Acorn snacks are elite.", "I heard the crunch before I saw it."], chat: ["I hide my treasures with precision.", "Every branch has a shortcut if you are brave."] },
+            funFact: "Squirrels use their tails for balance, warmth and even quick communication.",
+            backstory: "Rescued from a stormy nest fall and now insists every bookshelf is a climbing wall."
+        },
+        {
+            id: "pine-chipmunk",
+            species: "Pine Chipmunk",
+            habitat: "Pinecone Path",
+            defaultName: "Piney",
+            altNames: ["Sprig", "Toast", "Miso", "Poppy"],
+            rarity: "common",
+            appearance: { kind: "squirrel", markingKind: "chipmunk", primary: "#bb8156", secondary: "#f8e2c7", accent: "#6a4026", eyeColor: "#332117" },
+            archetype: "Pocket-Sized Planner",
+            traits: ["Neat", "Fast", "Curious"],
+            stats: { cuddliness: 6, playfulness: 8, cleverness: 8, mischief: 6, talk: 6 },
+            phrases: { pet: ["I accept gentle pats and compliments.", "That was a very tidy cuddle."], play: ["I do my best work at top speed.", "Catch me before I vanish behind the pot plant."], treat: ["Cheek pouches ready!", "Excellent snack logistics."], chat: ["I alphabetise my favourite seeds in my head.", "I always know where the good hiding spots are."] },
+            funFact: "Chipmunks can carry a surprising number of seeds in their cheek pouches.",
+            backstory: "Wandered out of a picnic basket with a crumb trail behind him and never looked back."
+        },
+        {
+            id: "velvet-mouse",
+            species: "Velvet Mouse",
+            habitat: "Moonseed Pantry",
+            defaultName: "Velvet",
+            altNames: ["Pico", "Bean", "Mallow", "Dot"],
+            rarity: "common",
+            appearance: { kind: "mouse", primary: "#b8a3ad", secondary: "#f8edf1", accent: "#7f6871", eyeColor: "#281d22" },
+            archetype: "Whisper Scout",
+            traits: ["Tiny", "Observant", "Sweet"],
+            stats: { cuddliness: 7, playfulness: 7, cleverness: 8, mischief: 4, talk: 5 },
+            phrases: { pet: ["Soft pats make me feel brave.", "I am a tiny cloud of approval."], play: ["Ready, set, scurry!", "My little feet are incredibly fast."], treat: ["Seed snacks are perfect every time.", "This nibble was worth the risk."], chat: ["I hear the kettle before anyone else.", "Quiet corners are my favourite thinking spots."] },
+            funFact: "Mice use their whiskers to judge spaces and explore in low light.",
+            backstory: "Found nesting in a craft basket full of felt scraps and instantly matched the decor."
+        },
+        {
+            id: "honey-hamster",
+            species: "Honey Hamster",
+            habitat: "Sunflower Nook",
+            defaultName: "Toffee",
+            altNames: ["Biscuit", "Crumb", "Pudding", "Sunny"],
+            rarity: "common",
+            appearance: { kind: "hamster", primary: "#d9a96c", secondary: "#fff0d6", accent: "#8f6136", eyeColor: "#2e2117" },
+            archetype: "Snack Hoarder",
+            traits: ["Round", "Cosy", "Busy"],
+            stats: { cuddliness: 9, playfulness: 7, cleverness: 6, mischief: 5, talk: 4 },
+            phrases: { pet: ["Warm hands are premium hamster furniture.", "I am now one content little puff."], play: ["Wheel time counts as athletics.", "I can do a surprisingly dramatic sprint."], treat: ["I would store this snack for later, but maybe not.", "Best bite of my tiny life."], chat: ["I respect blankets and quiet routines.", "My cheeks are for snacks and secrets."] },
+            funFact: "Hamsters have expandable cheek pouches that help them carry food to storage spots.",
+            backstory: "Came home in a sunflower-print carrier and immediately treated the food bowl like treasure."
+        },
+        {
+            id: "dandelion-guinea-pig",
+            species: "Dandelion Guinea Pig",
+            habitat: "Daisy Burrow",
+            defaultName: "Button",
+            altNames: ["Peep", "Custard", "Puff", "Lottie"],
+            rarity: "common",
+            appearance: { kind: "hamster", primary: "#c98d58", secondary: "#fff0d5", accent: "#7c4c2a", eyeColor: "#2e1f15" },
+            archetype: "Garden Squeaker",
+            traits: ["Friendly", "Round", "Vocal"],
+            stats: { cuddliness: 9, playfulness: 6, cleverness: 6, mischief: 3, talk: 8 },
+            phrases: { pet: ["Wheek of happiness!", "You found the best cuddly angle."], play: ["I prefer cheerful shuffles to zoomies.", "This game needs more snacks."], treat: ["Leafy greens deserve applause.", "Outstanding service and crunch."], chat: ["I narrate meal times very clearly.", "Soft hay piles are my idea of luxury."] },
+            funFact: "Guinea pigs communicate with squeaks, purrs and rumbles to show how they feel.",
+            backstory: "Was surrendered with a stack of fleece blankets and still picks the softest one in the room."
+        },
+        {
+            id: "willow-capybara",
+            species: "Willow Capybara",
+            habitat: "Reedbank Spa",
+            defaultName: "Willow",
+            altNames: ["Lagoon", "Maple", "Sage", "Mochi"],
+            rarity: "rare",
+            appearance: { kind: "hamster", primary: "#9e7453", secondary: "#e9d4b9", accent: "#5e412d", eyeColor: "#231913" },
+            archetype: "Zen Floater",
+            traits: ["Calm", "Social", "Steady"],
+            stats: { cuddliness: 8, playfulness: 5, cleverness: 7, mischief: 2, talk: 4 },
+            phrases: { pet: ["A peaceful pat is always welcome.", "I radiate tranquil loaf energy."], play: ["A slow splash can still be fun.", "I am not hurrying, and that is the point."], treat: ["Fresh greens are deeply soothing.", "This snack matches my vibe perfectly."], chat: ["Warm water and gentle company fix most things.", "I like making everybody feel calm."] },
+            funFact: "Capybaras are highly social and often relax together in warm water.",
+            backstory: "Moved from a wildlife sanctuary pond and quickly became the calmest creature in the whole haven."
+        },
+        {
+            id: "sun-quokka",
+            species: "Sun Quokka",
+            habitat: "Golden Fern Walk",
+            defaultName: "Sunny",
+            altNames: ["Peb", "Lemon", "Marlow", "Sparrow"],
+            rarity: "uncommon",
+            appearance: { kind: "hamster", primary: "#c39a6b", secondary: "#f4e5cc", accent: "#7d5d3f", eyeColor: "#2d2118" },
+            archetype: "Grin Captain",
+            traits: ["Cheerful", "Bouncy", "Sweet"],
+            stats: { cuddliness: 8, playfulness: 8, cleverness: 6, mischief: 4, talk: 6 },
+            phrases: { pet: ["I was already smiling, but now it is extra.", "You brought the cosy sunshine."], play: ["Happy hops incoming!", "This is a very good day for bouncing."], treat: ["Snack accepted with joy.", "I love a crunchy little celebration."], chat: ["I think every path looks brighter after a nap.", "People say I look friendly because I am."] },
+            funFact: "Quokkas are small wallabies famous for their naturally smiley expressions.",
+            backstory: "Arrived from a conservation program and charmed absolutely everyone before dinner."
+        },
+        {
+            id: "bramble-wombat",
+            species: "Bramble Wombat",
+            habitat: "Bramble Burrow",
+            defaultName: "Mallow",
+            altNames: ["Bram", "Pebble", "Wren", "Plum"],
+            rarity: "rare",
+            appearance: { kind: "hamster", primary: "#8b7565", secondary: "#dcc9b9", accent: "#5d4a3d", eyeColor: "#241b17" },
+            archetype: "Burrow Builder",
+            traits: ["Solid", "Patient", "Reliable"],
+            stats: { cuddliness: 8, playfulness: 5, cleverness: 7, mischief: 3, talk: 4 },
+            phrases: { pet: ["I am sturdy, soft and very pleased.", "That was a lovely grounded little pat."], play: ["Tunnel games suit me best.", "I can still win without rushing."], treat: ["Root veggie snacks feel luxurious.", "You understand wombat priorities."], chat: ["I respect a well-made den.", "A peaceful burrow is basically art."] },
+            funFact: "Wombats are powerful diggers with strong claws built for tunnelling.",
+            backstory: "Came from a rescue burrow project and still inspects every blanket pile like a construction expert."
+        },
+        {
+            id: "brook-beaver",
+            species: "Brook Beaver",
+            habitat: "Maple Dam",
+            defaultName: "Barkley",
+            altNames: ["Chip", "Drift", "Timber", "Scout"],
+            rarity: "uncommon",
+            appearance: { kind: "beaver", primary: "#95663f", secondary: "#f1d6b5", accent: "#6b4323", eyeColor: "#24170f" },
+            archetype: "Pocket Engineer",
+            traits: ["Handy", "Focused", "Busy"],
+            stats: { cuddliness: 7, playfulness: 7, cleverness: 9, mischief: 4, talk: 5 },
+            phrases: { pet: ["Builder break accepted.", "You may pat the head, not the blueprint."], play: ["I can make a game out of sticks and ambition.", "Obstacle course? Perfect."], treat: ["Crunchy bark biscuits are top tier.", "This reward has excellent texture."], chat: ["I fix problems one twig at a time.", "Little projects make my day sparkle."] },
+            funFact: "Beavers can shape waterways by building dams and lodges from branches and mud.",
+            backstory: "Was found stacking popsicle sticks into tiny bridges and got adopted on the spot."
+        },
+        {
+            id: "moon-platypus",
+            species: "Moon Platypus",
+            habitat: "Silverbill Creek",
+            defaultName: "Nova",
+            altNames: ["Paddle", "Bloop", "Dusk", "Piper"],
+            rarity: "rare",
+            appearance: { kind: "beaver", bodyKind: "beaver", headKind: "mouse", earKind: "mouse", tailKind: "beaver", whiskerKind: "mouse", noseKind: "duck", mouthKind: "duck", primary: "#8b6b50", secondary: "#f2dfc8", accent: "#6d4f36", eyeColor: "#241813" },
+            archetype: "Oddball Genius",
+            traits: ["Curious", "Quiet", "Unforgettable"],
+            stats: { cuddliness: 7, playfulness: 7, cleverness: 10, mischief: 5, talk: 4 },
+            phrases: { pet: ["I know I am weird and wonderful.", "Tiny platypus approval granted."], play: ["I like games with mystery and splashing.", "Observe my multi-talented little chaos."], treat: ["River snacks are my favourite prizes.", "This treat has excellent detective energy."], chat: ["I contain several excellent design ideas at once.", "Being unique is very efficient, actually."] },
+            funFact: "Platypuses are mammals that lay eggs and can sense tiny electrical signals in water.",
+            backstory: "Rescued from a creek education centre and still looks faintly delighted by every puddle."
+        },
+        {
+            id: "puddle-piglet",
+            species: "Puddle Piglet",
+            habitat: "Apple Orchard Yard",
+            defaultName: "Oinkie",
+            altNames: ["Apple", "Trotter", "Biscuit", "Bubbles"],
+            rarity: "common",
+            appearance: { kind: "piglet", primary: "#f4b8c1", secondary: "#ffdce3", accent: "#dd8f9d", eyeColor: "#4a3237" },
+            archetype: "Muddy Optimist",
+            traits: ["Cheery", "Hungry", "Lively"],
+            stats: { cuddliness: 8, playfulness: 8, cleverness: 6, mischief: 6, talk: 8 },
+            phrases: { pet: ["Snout boops and pats are both good.", "I am a rosy little bundle of joy."], play: ["Trotting race!", "I can turn anything into a silly adventure."], treat: ["Apple slices deserve fanfare.", "This snack is absolute piglet luxury."], chat: ["Puddles are not accidents. They are invitations.", "I always know when someone opens the pantry."] },
+            funFact: "Pigs are highly intelligent and can learn games, puzzles and routines quickly.",
+            backstory: "Showed up muddy and proud after escaping a petting paddock and never stopped making friends."
+        },
+        {
+            id: "butter-lamb",
+            species: "Butter Lamb",
+            habitat: "Buttercup Hill",
+            defaultName: "Mimi",
+            altNames: ["Floss", "Pudding", "Bun", "Daisy"],
+            rarity: "common",
+            appearance: { kind: "sheep", primary: "#fff5ea", secondary: "#f2d7b7", accent: "#b58b69", eyeColor: "#38261c" },
+            archetype: "Bouncy Blanket",
+            traits: ["Gentle", "Soft", "Sunny"],
+            stats: { cuddliness: 10, playfulness: 7, cleverness: 5, mischief: 2, talk: 4 },
+            phrases: { pet: ["I am basically a walking hug.", "That pat felt like a warm cloud."], play: ["Little jumps count as athletics.", "I can frolic with the best of them."], treat: ["Sweet hay snacks are perfect.", "A tiny chew and a happy sigh."], chat: ["Soft mornings are my favourite kind.", "I like breezes, blankets and kind company."] },
+            funFact: "Lambs recognise their mothers by voice and can learn familiar sounds quickly.",
+            backstory: "Was bottle-fed in foster care and still leans into every bit of gentle affection."
+        },
+        {
+            id: "marshmallow-sheep",
+            species: "Marshmallow Sheep",
+            habitat: "Cloudberry Pasture",
+            defaultName: "Floss",
+            altNames: ["Cloud", "Puffin", "Nori", "Meringue"],
+            rarity: "uncommon",
+            appearance: { kind: "sheep", primary: "#f8f3ef", secondary: "#ead5c7", accent: "#aa8d79", eyeColor: "#3b2a22" },
+            archetype: "Cosy Drifter",
+            traits: ["Sleepy", "Calm", "Sweet"],
+            stats: { cuddliness: 10, playfulness: 5, cleverness: 5, mischief: 2, talk: 3 },
+            phrases: { pet: ["Fluff service appreciated.", "You may absolutely lean on the wool."], play: ["A gentle prance will do nicely.", "I prefer graceful fun to frantic fun."], treat: ["This snack is wonderfully civilised.", "Excellent nibble. No notes."], chat: ["I like naps that feel like weather.", "Blankets and silence are elite."] },
+            funFact: "Sheep can remember faces and recognise both sheep and humans for a long time.",
+            backstory: "Retired from a tiny hobby farm and now spends afternoons looking like a decorative cloud."
+        },
+        {
+            id: "clover-goat",
+            species: "Clover Goat",
+            habitat: "Thyme Terrace",
+            defaultName: "Clover",
+            altNames: ["Skip", "Fern", "Pogo", "Junie"],
+            rarity: "uncommon",
+            appearance: { kind: "goat", hornKind: "goat", primary: "#e6dcc7", secondary: "#f8f2e4", accent: "#9a815f", eyeColor: "#34271f" },
+            archetype: "Fence Jumper",
+            traits: ["Plucky", "Smart", "Funny"],
+            stats: { cuddliness: 7, playfulness: 9, cleverness: 8, mischief: 7, talk: 6 },
+            phrases: { pet: ["That was nice. I will remember you kindly.", "Goat friendship unlocked."], play: ["I was born to bounce.", "If there is a ledge, I will stand on it."], treat: ["Leafy treats are my weakness.", "Crisp snack, crisp mood."], chat: ["I test boundaries because someone has to.", "Curiosity is just another form of cardio."] },
+            funFact: "Goats are agile climbers and can balance on surprisingly narrow surfaces.",
+            backstory: "Was adopted after escaping every pen at a rescue fair and somehow improving the event."
+        },
+        {
+            id: "meadow-calf",
+            species: "Meadow Calf",
+            habitat: "Bluebell Barn",
+            defaultName: "Poppy",
+            altNames: ["Moozi", "Clover", "Bramble", "Oat"],
+            rarity: "rare",
+            appearance: { kind: "goat", bodyKind: "goat", headKind: "goat", earKind: "goat", tailKind: "goat", hornKind: "cow", markingKind: "cow", primary: "#faf6ef", secondary: "#f1d4bf", accent: "#7c5a43", eyeColor: "#32241c" },
+            archetype: "Gentle Grazer",
+            traits: ["Kind", "Steady", "Soft"],
+            stats: { cuddliness: 9, playfulness: 6, cleverness: 6, mischief: 2, talk: 5 },
+            phrases: { pet: ["That was lovely and calm.", "I make an excellent cuddle break."], play: ["A meadow trot is enough excitement for me.", "I can still win with a gentle shuffle."], treat: ["Fresh grass snacks? Delightful.", "This treat tastes like a perfect afternoon."], chat: ["I like slow mornings and sun on the fence.", "Everything feels better after a peaceful chew."] },
+            funFact: "Young calves learn social cues quickly and often copy the behaviour of calm herd mates.",
+            backstory: "Came from a sanctuary field day and won hearts by politely following the flower cart."
+        },
+        {
+            id: "cloud-llama",
+            species: "Cloud Llama",
+            habitat: "Silver Saddle Ridge",
+            defaultName: "Lulu",
+            altNames: ["Skye", "Meringue", "Tufty", "Pico"],
+            rarity: "rare",
+            appearance: { kind: "alpaca", primary: "#f0e4d7", secondary: "#fff8f0", accent: "#b4977c", eyeColor: "#43352c" },
+            archetype: "Drama-Free Darling",
+            traits: ["Elegant", "Funny", "Composed"],
+            stats: { cuddliness: 8, playfulness: 6, cleverness: 7, mischief: 4, talk: 5 },
+            phrases: { pet: ["Very refined. Thank you.", "You may admire the fluff from this angle too."], play: ["A jaunty little parade would be lovely.", "I do enjoy elegant nonsense."], treat: ["This snack has excellent standards.", "Truly a deluxe chew."], chat: ["I like mountain breezes and tidy ribbons.", "One can be graceful and silly at once."] },
+            funFact: "Llamas communicate with humming, body posture and expressive ears.",
+            backstory: "Rehomed from a travelling petting zoo and immediately claimed the fanciest blanket."
+        },
+        {
+            id: "moon-owl",
+            species: "Moon Owl",
+            habitat: "Stargazer Pine",
+            defaultName: "Hootie",
+            altNames: ["Nova", "Cinder", "Echo", "Twila"],
+            rarity: "rare",
+            appearance: { kind: "owl", noseKind: "owl", mouthKind: "owl", primary: "#8e7c68", secondary: "#efe2ce", accent: "#5c4738", eyeColor: "#2b200f" },
+            archetype: "Night Librarian",
+            traits: ["Wise", "Quiet", "Precise"],
+            stats: { cuddliness: 7, playfulness: 5, cleverness: 10, mischief: 2, talk: 6 },
+            phrases: { pet: ["I approve of respectful affection.", "That was a soft little moonbeam of kindness."], play: ["A strategic swoop sounds fun.", "I prefer games with careful timing."], treat: ["This snack is worthy of my perch.", "Delightfully crunchy and very dignified."], chat: ["The night is full of useful information.", "I believe every answer sounds better after a pause."] },
+            funFact: "Owls can turn their heads very far to scan their surroundings without moving their bodies.",
+            backstory: "Was rescued from a school hall rafters situation and now supervises study time from above."
+        },
+        {
+            id: "snowy-barn-owl",
+            species: "Snowy Barn Owl",
+            habitat: "Frost Loft",
+            defaultName: "Glint",
+            altNames: ["Shiver", "Pearl", "Tallow", "Wisp"],
+            rarity: "ultra-rare",
+            appearance: { kind: "owl", noseKind: "owl", mouthKind: "owl", primary: "#f4f0ea", secondary: "#fffaf5", accent: "#cbb7a2", eyeColor: "#2f261d" },
+            archetype: "Silent Snowglider",
+            traits: ["Calm", "Rare", "Graceful"],
+            stats: { cuddliness: 8, playfulness: 5, cleverness: 10, mischief: 2, talk: 5 },
+            phrases: { pet: ["Soft pats suit a snowy owl perfectly.", "I feel pleasantly luminous now."], play: ["I glide rather than rush.", "This game could use more moonlight."], treat: ["A little treat, a little triumph.", "Exquisite and efficient."], chat: ["Silence can feel very golden.", "I notice the things other pets miss."] },
+            funFact: "Many owls have feathers shaped to help them fly very quietly.",
+            backstory: "Transferred from a wildlife rescue aviary and still gives the room a magical hush."
+        },
+        {
+            id: "pebble-penguin",
+            species: "Pebble Penguin",
+            habitat: "Icicle Bay",
+            defaultName: "Pebble",
+            altNames: ["Skipper", "Chill", "Merry", "Tux"],
+            rarity: "uncommon",
+            appearance: { kind: "penguin", noseKind: "penguin", mouthKind: "penguin", primary: "#20242d", secondary: "#f8fbff", accent: "#f1a833", eyeColor: "#1b2029" },
+            archetype: "Tiny Tuxedo",
+            traits: ["Brave", "Funny", "Loyal"],
+            stats: { cuddliness: 8, playfulness: 8, cleverness: 7, mischief: 4, talk: 6 },
+            phrases: { pet: ["Waddle cuddle accepted.", "I am very sleek and very pleased."], play: ["Ice slide champion reporting in!", "Short legs, huge commitment."], treat: ["Fishy snack acquired!", "That bite deserves a victory lap."], chat: ["I like orderly pebbles and dramatic waddles.", "Cold air makes me feel extra energetic."] },
+            funFact: "Penguins often use pebbles when building nests and can be very devoted partners.",
+            backstory: "Was hand-raised at a coastal rescue and still presents shiny pebbles like tiny gifts."
+        },
+        {
+            id: "starlight-puffin",
+            species: "Starlight Puffin",
+            habitat: "Aurora Cliffs",
+            defaultName: "Skipper",
+            altNames: ["Beacon", "Miso", "Flit", "Coral"],
+            rarity: "rare",
+            appearance: { kind: "penguin", markingKind: "puffin", noseKind: "penguin", mouthKind: "penguin", primary: "#1b1e26", secondary: "#fff8f1", accent: "#f1873a", eyeColor: "#1e232f" },
+            archetype: "Cliffside Comedian",
+            traits: ["Bright", "Playful", "Bold"],
+            stats: { cuddliness: 7, playfulness: 9, cleverness: 7, mischief: 5, talk: 6 },
+            phrases: { pet: ["A puffin pat is a premium event.", "I look tiny, but I contain daring."], play: ["Wing wiggle warm-up complete.", "I was made for funny little sprints."], treat: ["Best beakful of the week.", "Snack secured with style."], chat: ["Sea breezes make me feel brave.", "I like dramatic cliffs and even more dramatic entrances."] },
+            funFact: "Puffins use their bright beaks to signal during breeding season and can hold several fish at once.",
+            backstory: "Arrived from a marine bird rehab and immediately turned every hallway into a catwalk."
+        },
+        {
+            id: "honey-bee",
+            species: "Honey Bee",
+            habitat: "Lavender Hives",
+            defaultName: "Buzzby",
+            altNames: ["Pollen", "Amber", "Pip", "Sunny"],
+            rarity: "uncommon",
+            appearance: { kind: "bee", primary: "#ffd65c", secondary: "#f2fbff", accent: "#3b2e22", eyeColor: "#2f271e" },
+            archetype: "Garden Zoomer",
+            traits: ["Busy", "Bright", "Helpful"],
+            stats: { cuddliness: 5, playfulness: 9, cleverness: 7, mischief: 4, talk: 7 },
+            phrases: { pet: ["Tiny buzzing cuddle incoming.", "I feel adored and pollinated with joy."], play: ["Zoomie loop!", "I can absolutely outfly this toy."], treat: ["Flower syrup is my dream snack.", "Sweet reward detected."], chat: ["I like organised gardens and good teamwork.", "There is always another flower to inspect."] },
+            funFact: "Honey bees communicate useful food locations with a movement pattern called the waggle dance.",
+            backstory: "Nursed through a cold snap in a greenhouse and now treats every blossom like a friend."
+        },
+        {
+            id: "bumble-bee",
+            species: "Bumble Bee",
+            habitat: "Clover Apiary",
+            defaultName: "Bramble",
+            altNames: ["Buzz", "Daisy", "Pollen", "Maple"],
+            rarity: "rare",
+            appearance: { kind: "bee", primary: "#f8d14d", secondary: "#eaf5ff", accent: "#242428", eyeColor: "#211f18" },
+            archetype: "Fluffy Flyer",
+            traits: ["Round", "Cheery", "Determined"],
+            stats: { cuddliness: 6, playfulness: 8, cleverness: 7, mischief: 3, talk: 7 },
+            phrases: { pet: ["Soft little bee hug unlocked.", "I hum when I am happy, which is now."], play: ["I may wobble, but I still zoom.", "This game could use more flowers."], treat: ["A sugary sip? Magnificent.", "Tiny bee delight achieved."], chat: ["I like flowers that feel like sunshine.", "Being fluffy and busy is a very good life."] },
+            funFact: "Bumble bees can warm their flight muscles by vibrating them before takeoff.",
+            backstory: "Rescued from a florist van and still smells faintly like wildflowers and adventure."
+        },
+        {
+            id: "twilight-bat",
+            species: "Twilight Bat",
+            habitat: "Velvet Cave",
+            defaultName: "Echo",
+            altNames: ["Dusk", "Pip", "Shade", "Moth"],
+            rarity: "rare",
+            appearance: { kind: "bat", primary: "#5a5167", secondary: "#d9d0e6", accent: "#2f2936", eyeColor: "#1e1a25" },
+            archetype: "Moonbeam Acrobat",
+            traits: ["Graceful", "Quick", "Clever"],
+            stats: { cuddliness: 6, playfulness: 9, cleverness: 8, mischief: 6, talk: 5 },
+            phrases: { pet: ["A bat can enjoy gentle pats too.", "I am a cosy little night flier."], play: ["Loop-de-loop time!", "I was built for upside-down fun."], treat: ["This snack is worthy of the night shift.", "Mmm. Excellent tiny reward."], chat: ["The dark is full of helpful details.", "I am basically moonlight with wings."] },
+            funFact: "Many bats use echolocation, sending out sounds and listening for echoes to navigate.",
+            backstory: "Recovered from a wildlife rehab and now naps like a tiny velvet lantern behind the curtains."
+        },
+        {
+            id: "rosy-fruit-bat",
+            species: "Rosy Fruit Bat",
+            habitat: "Orchid Grotto",
+            defaultName: "Blush",
+            altNames: ["Berry", "Luma", "Peach", "Nova"],
+            rarity: "ultra-rare",
+            appearance: { kind: "bat", primary: "#7a5d77", secondary: "#f6d8df", accent: "#433245", eyeColor: "#281d2b" },
+            archetype: "Orchard Floatie",
+            traits: ["Sweet", "Gentle", "Elegant"],
+            stats: { cuddliness: 7, playfulness: 7, cleverness: 8, mischief: 3, talk: 5 },
+            phrases: { pet: ["That was soft as blossom air.", "I feel very safe in this cuddle."], play: ["A graceful swoop is enough for me.", "I like games with a little sparkle."], treat: ["Fruit snacks are poetry.", "This bite tastes like a moonlit orchard."], chat: ["I think best while hanging quietly.", "Night gardens are my favourite kind of beautiful."] },
+            funFact: "Fruit bats help forests by spreading seeds and pollen as they feed.",
+            backstory: "Came from a conservation nursery and still looks happiest near anything flowering."
+        },
+        {
+            id: "drift-dolphin",
+            species: "Drift Dolphin",
+            habitat: "Crystal Tide",
+            defaultName: "Drift",
+            altNames: ["Wave", "Skipper", "Pearl", "Mira"],
+            rarity: "legendary",
+            appearance: { kind: "dolphin", noseKind: "dolphin", mouthKind: "dolphin", primary: "#72b7da", secondary: "#dff5ff", accent: "#3d7ea1", eyeColor: "#193247" },
+            archetype: "Laughing Wave",
+            traits: ["Brilliant", "Playful", "Friendly"],
+            stats: { cuddliness: 7, playfulness: 10, cleverness: 10, mischief: 5, talk: 8 },
+            phrases: { pet: ["That was fin-tastic. Sorry, I had to.", "I am a very happy little splash."], play: ["Race you to the imaginary surf!", "I turn every game into a water show."], treat: ["Fishy treats are a solid yes.", "Excellent reward. Ten out of ten splashes."], chat: ["I like jokes, teamwork and smooth sea songs.", "Life is better with a little echoing laughter."] },
+            funFact: "Dolphins are highly social and can recognise each other using unique whistle calls.",
+            backstory: "Transferred from a marine rescue education team and somehow made the whole haven feel brighter."
+        },
+        {
+            id: "ripple-manatee",
+            species: "Ripple Manatee",
+            habitat: "Lily Lagoon",
+            defaultName: "Ripple",
+            altNames: ["Lotus", "Drizzle", "Mallow", "Sora"],
+            rarity: "rare",
+            appearance: { kind: "dolphin", bodyKind: "dolphin", headKind: "dolphin", tailKind: "dolphin", noseKind: "dolphin", mouthKind: "dolphin", primary: "#9fb7ba", secondary: "#dfeeed", accent: "#6c878a", eyeColor: "#243638" },
+            archetype: "Marshmallow Mariner",
+            traits: ["Gentle", "Sleepy", "Kind"],
+            stats: { cuddliness: 9, playfulness: 4, cleverness: 7, mischief: 1, talk: 3 },
+            phrases: { pet: ["Soft little sea hug accepted.", "I am all calm and squish."], play: ["Maybe one easy floaty game.", "I prefer peaceful fun."], treat: ["Leafy water snacks are perfect.", "A calm little munch is all I need."], chat: ["Warm shallows are my happy place.", "I like slow thoughts and kind friends."] },
+            funFact: "Manatees are gentle herbivores that spend much of their day grazing on aquatic plants.",
+            backstory: "Recovered from a rescue lagoon and now treats every quiet corner like a spa retreat."
+        },
+        {
+            id: "marigold-elephant",
+            species: "Marigold Elephant",
+            habitat: "Sunpath Savannah",
+            defaultName: "Goldie",
+            altNames: ["Mallow", "Saffron", "Pebble", "Nori"],
+            rarity: "legendary",
+            appearance: { kind: "elephant", noseKind: "elephant", mouthKind: "elephant", primary: "#a9a6af", secondary: "#e8e6ef", accent: "#6f6977", eyeColor: "#22222a" },
+            archetype: "Gentle Giant",
+            traits: ["Wise", "Kind", "Steady"],
+            stats: { cuddliness: 9, playfulness: 6, cleverness: 10, mischief: 2, talk: 5 },
+            phrases: { pet: ["That was wonderfully kind.", "I remember every good cuddle."], play: ["Big steps, big fun.", "I can still be graceful, thank you."], treat: ["This snack deserves a proud little trumpet.", "Excellent choice, dear friend."], chat: ["Patience is one of my best tricks.", "I like remembering happy things in detail."] },
+            funFact: "Elephants have excellent memories and use their trunks for touching, smelling and lifting objects.",
+            backstory: "Came from a sanctuary storybook program and carries herself like a warm, wise parade."
+        },
+        {
+            id: "blossom-sloth",
+            species: "Blossom Sloth",
+            habitat: "Rainflower Canopy",
+            defaultName: "Blossom",
+            altNames: ["Petal", "Cloud", "Miso", "Fern"],
+            rarity: "uncommon",
+            appearance: { kind: "sloth", primary: "#8e735d", secondary: "#e6d4bf", accent: "#5f4738", eyeColor: "#2a1f17" },
+            archetype: "Slow Bloom",
+            traits: ["Calm", "Tender", "Thoughtful"],
+            stats: { cuddliness: 9, playfulness: 3, cleverness: 7, mischief: 1, talk: 4 },
+            phrases: { pet: ["That was worth waking up for.", "I feel softly delighted."], play: ["We can play slowly and still have fun.", "My best move is a thoughtful reach."], treat: ["A snack this nice deserves a pause.", "Slow chewing is part of the joy."], chat: ["I like taking my time with everything lovely.", "Hanging out is my speciality in every sense."] },
+            funFact: "Sloths move slowly to conserve energy and can spend much of their lives hanging in trees.",
+            backstory: "Was hand-reared after a storm rescue and now treats every blanket edge like a branch."
+        },
+        {
+            id: "coral-chameleon",
+            species: "Coral Chameleon",
+            habitat: "Coral Fernhouse",
+            defaultName: "Coral",
+            altNames: ["Prism", "Tint", "Lumi", "Minty"],
+            rarity: "ultra-rare",
+            appearance: { kind: "chameleon", primary: "#68c2a7", secondary: "#dff7df", accent: "#ff7f7f", eyeColor: "#21493f" },
+            archetype: "Colour Wizard",
+            traits: ["Observant", "Quirky", "Artful"],
+            stats: { cuddliness: 6, playfulness: 6, cleverness: 9, mischief: 4, talk: 6 },
+            phrases: { pet: ["I may change colour, but I always enjoy kindness.", "That pat felt very pastel."], play: ["Camouflage tag is my game.", "I can disappear and win at the same time."], treat: ["Bright little snacks suit me.", "A delicious bite and an excellent mood."], chat: ["Colour is a language if you pay attention.", "I like feeling like a walking mood ring."] },
+            funFact: "Chameleons can shift their colours to signal mood, temperature and communication.",
+            backstory: "Came from a reptile rescue greenhouse and now treats every plant stand like a stage."
+        },
+        {
+            id: "sunny-gecko",
+            species: "Sunny Gecko",
+            habitat: "Warmstone Wall",
+            defaultName: "Sunny",
+            altNames: ["Peb", "Toast", "Roo", "Tika"],
+            rarity: "uncommon",
+            appearance: { kind: "chameleon", primary: "#f0c45b", secondary: "#fff0b8", accent: "#cf8b3d", eyeColor: "#533c1a" },
+            archetype: "Wall Walker",
+            traits: ["Nimble", "Bright", "Curious"],
+            stats: { cuddliness: 6, playfulness: 8, cleverness: 7, mischief: 5, talk: 5 },
+            phrases: { pet: ["Warm hands? Excellent gecko weather.", "I approve of this tiny attention break."], play: ["Watch me stick the landing.", "Climbing counts as showing off, right?"], treat: ["A snack this good deserves a tail wiggle.", "Perfect little bite."], chat: ["Sun-warmed rocks solve many problems.", "I always look for the highest good perch."] },
+            funFact: "Many geckos have specialised toe pads that help them cling to smooth surfaces.",
+            backstory: "Was found exploring a nursery window and promptly decided warm ledges were the best invention."
+        },
+        {
+            id: "mint-iguana",
+            species: "Mint Iguana",
+            habitat: "Mango Terrace",
+            defaultName: "Mint",
+            altNames: ["Leaf", "Jade", "Sora", "Kiwi"],
+            rarity: "ultra-rare",
+            appearance: { kind: "chameleon", primary: "#7cb36a", secondary: "#dff0c7", accent: "#4b7a3f", eyeColor: "#20351f" },
+            archetype: "Sunbathing Sage",
+            traits: ["Relaxed", "Sharp", "Cool"],
+            stats: { cuddliness: 6, playfulness: 5, cleverness: 8, mischief: 2, talk: 4 },
+            phrases: { pet: ["I am a fan of calm, warm affection.", "That was surprisingly lovely."], play: ["Only if there is a sunny rock involved.", "I prefer elegant movement to chaos."], treat: ["Fresh greens? Excellent decision.", "A nice crisp snack makes everything better."], chat: ["I think well when the sun is just right.", "Confidence is mostly posture and good lighting."] },
+            funFact: "Iguanas use their tails for balance and defence and spend lots of time basking for warmth.",
+            backstory: "Retired from a reptile classroom display and now lives like a tiny leafy philosopher."
+        },
+        {
+            id: "lantern-lemur",
+            species: "Lantern Lemur",
+            habitat: "Lantern Fig Grove",
+            defaultName: "Luma",
+            altNames: ["Fig", "Orbit", "Twix", "Mina"],
+            rarity: "ultra-rare",
+            appearance: { kind: "lemur", markingKind: "lemur", primary: "#8f9aa6", secondary: "#f4f0e8", accent: "#38424d", eyeColor: "#1f252b" },
+            archetype: "Moonlight Jumper",
+            traits: ["Curious", "Lively", "Social"],
+            stats: { cuddliness: 7, playfulness: 9, cleverness: 8, mischief: 6, talk: 7 },
+            phrases: { pet: ["I like gentle pats and dramatic moonlight.", "That felt safely wonderful."], play: ["Long tail, big energy!", "Branch-hop challenge accepted."], treat: ["Fig snacks are elite.", "This bite is worthy of a celebratory bounce."], chat: ["Night gardens are full of interesting rumours.", "I like travelling by leap whenever possible."] },
+            funFact: "Lemurs use their long tails for balance while moving through trees.",
+            backstory: "Arrived from a conservation nursery and instantly made the hanging baskets feel like home."
+        },
+        {
+            id: "desert-meerkat",
+            species: "Desert Meerkat",
+            habitat: "Sandglass Lookout",
+            defaultName: "Pico",
+            altNames: ["Scout", "Dune", "Roo", "Bram"],
+            rarity: "uncommon",
+            appearance: { kind: "mouse", bodyKind: "lemur", headKind: "mouse", earKind: "mouse", tailKind: "ferret", whiskerKind: "mouse", primary: "#d1a273", secondary: "#f4dec4", accent: "#7f5938", eyeColor: "#2e1d12" },
+            archetype: "Tiny Sentinel",
+            traits: ["Alert", "Brave", "Funny"],
+            stats: { cuddliness: 6, playfulness: 8, cleverness: 8, mischief: 5, talk: 7 },
+            phrases: { pet: ["One eye on the horizon, one on the cuddles.", "I can be vigilant and adorable together."], play: ["Watch post first, zoomies second.", "I take games very seriously for a tiny creature."], treat: ["Crunchy snacks keep morale high.", "Reward received. Perimeter secure."], chat: ["I like knowing who is coming and why.", "Sunny lookout spots make me feel heroic."] },
+            funFact: "Meerkats often take turns acting as lookouts while the rest of the group searches for food.",
+            backstory: "Was fostered with a little sand pit and still climbs the highest cushion to inspect the room."
+        },
+        {
+            id: "cocoa-monkey",
+            species: "Cocoa Monkey",
+            habitat: "Cinnamon Canopy",
+            defaultName: "Coco",
+            altNames: ["Bean", "Miso", "Swing", "Dart"],
+            rarity: "rare",
+            appearance: { kind: "lemur", markingKind: "monkey", tailKind: "ferret", primary: "#8a5f42", secondary: "#f1d4b7", accent: "#5d3d2a", eyeColor: "#281912" },
+            archetype: "Mischief Swinger",
+            traits: ["Playful", "Clever", "Bold"],
+            stats: { cuddliness: 7, playfulness: 10, cleverness: 8, mischief: 8, talk: 7 },
+            phrases: { pet: ["I can pause climbing for this cuddle.", "That was a very good monkey moment."], play: ["Swing first, ask questions later.", "I was born for dramatic leaps."], treat: ["Banana chips? Say no more.", "That snack had excellent bounce energy."], chat: ["I think better while hanging upside down a little.", "Every curtain looks like a challenge."] },
+            funFact: "Many monkeys use long tails and strong limbs to balance as they move through trees.",
+            backstory: "Was rehomed from a sanctuary enrichment program and immediately befriended every hanging blanket."
+        },
+        {
+            id: "arctic-fox",
+            species: "Arctic Fox",
+            habitat: "Snowglow Tundra",
+            defaultName: "Frost",
+            altNames: ["Glacier", "Mallow", "Skim", "Lark"],
+            rarity: "uncommon",
+            appearance: { kind: "fox", primary: "#f2f4f8", secondary: "#ffffff", accent: "#c9d4df", eyeColor: "#243548" },
+            archetype: "Snow Sprint",
+            traits: ["Quick", "Bright", "Resilient"],
+            stats: { cuddliness: 7, playfulness: 9, cleverness: 8, mischief: 5, talk: 6 },
+            phrases: { pet: ["Cold paws, warm heart.", "You make snowy days feel cosy."], play: ["Tundra zoomies are the best zoomies.", "I can vanish into fluff and still win."], treat: ["A crisp treat for a crisp fox.", "Outstanding snack strategy."], chat: ["I like quiet snow and clever routes.", "My tail solves at least three problems a day."] },
+            funFact: "Arctic foxes grow thick seasonal fur and use their tails like warm scarves.",
+            backstory: "Joined the haven after a sanctuary transfer and immediately upgraded every blanket fort."
+        },
+        {
+            id: "snow-hare",
+            species: "Snow Hare",
+            habitat: "Winterberry Hollow",
+            defaultName: "Flurry",
+            altNames: ["Frosty", "Drift", "Mallow", "Skye"],
+            rarity: "common",
+            appearance: { kind: "rabbit", primary: "#f7f8fb", secondary: "#fffefe", accent: "#d7dbe7", eyeColor: "#2a3143" },
+            archetype: "Powder Puff Runner",
+            traits: ["Swift", "Gentle", "Light"],
+            stats: { cuddliness: 8, playfulness: 9, cleverness: 7, mischief: 4, talk: 4 },
+            phrases: { pet: ["I feel like a little snowball of joy.", "That was beautifully gentle."], play: ["Snowy hop sprint!", "I leave tiny tracks and big excitement."], treat: ["Crunchy winter treats are perfect.", "Best nibble in the burrow."], chat: ["Fresh snow makes everything feel sparkly.", "I like quiet starts and speedy finishes."] },
+            funFact: "Many hares have strong hind legs built for fast escapes and long leaps.",
+            backstory: "Was found resting in a frosty garden bed and now treats pillows like fresh snowdrifts."
+        },
+        {
+            id: "tide-walrus",
+            species: "Tide Walrus",
+            habitat: "Northlight Wharf",
+            defaultName: "Tide",
+            altNames: ["Harbor", "Fog", "Merry", "Brine"],
+            rarity: "rare",
+            appearance: { kind: "seal", markingKind: "walrus", primary: "#8f827c", secondary: "#d9cfc8", accent: "#6a5d57", eyeColor: "#2a2523" },
+            archetype: "Wharf Grandad",
+            traits: ["Calm", "Goofy", "Warm"],
+            stats: { cuddliness: 9, playfulness: 5, cleverness: 6, mischief: 2, talk: 5 },
+            phrases: { pet: ["That pat had excellent harbour energy.", "I am a very content sea potato."], play: ["One big flop and I am in the game.", "I like fun with a side of lounging."], treat: ["Fishy snacks? A wonderful idea.", "This reward deserves a happy snort."], chat: ["I respect cold air and warm naps equally.", "A good day includes a dock, a snack and no rush."] },
+            funFact: "Walruses use their whiskers to help detect food on the seafloor.",
+            backstory: "Retired from a marine rescue outreach team and now acts like every cushion is a personal wharf."
+        },
+        {
+            id: "river-swan",
+            species: "River Swan",
+            habitat: "Mirrorlake Reach",
+            defaultName: "Pearl",
+            altNames: ["Glide", "Ivory", "Lune", "Mist"],
+            rarity: "common",
+            appearance: { kind: "duck", primary: "#f8fbff", secondary: "#ffffff", accent: "#f4aa42", eyeColor: "#2b3140" },
+            archetype: "Grace Paddle",
+            traits: ["Elegant", "Calm", "Proud"],
+            stats: { cuddliness: 7, playfulness: 5, cleverness: 7, mischief: 2, talk: 6 },
+            phrases: { pet: ["A graceful thank-you to you.", "I do enjoy a poised little cuddle."], play: ["Perhaps a refined splash race.", "I can be elegant and competitive."], treat: ["This snack suits my standards.", "Lovely choice. Very swan approved."], chat: ["Still water makes excellent thinking space.", "I like quiet company and good posture."] },
+            funFact: "Swans are strong swimmers and can communicate with posture, sound and wing movements.",
+            backstory: "Was hand-reared after a riverbank rescue and still glides through every room in spirit."
+        },
+        {
+            id: "sun-parakeet",
+            species: "Sun Parakeet",
+            habitat: "Sunbeam Aviary",
+            defaultName: "Tango",
+            altNames: ["Mango", "Blaze", "Pico", "Jive"],
+            rarity: "uncommon",
+            appearance: { kind: "cockatiel", primary: "#ffd15b", secondary: "#fff5bf", accent: "#ff7f32", eyeColor: "#4c391d" },
+            archetype: "Hallway Soloist",
+            traits: ["Loud", "Cheerful", "Bright"],
+            stats: { cuddliness: 6, playfulness: 9, cleverness: 7, mischief: 6, talk: 10 },
+            phrases: { pet: ["Scritches and compliments please.", "I might sing about this later."], play: ["This game needs a soundtrack.", "Wing wiggles are ready."], treat: ["Seed snacks? Encore!", "That bite deserved a happy chirp."], chat: ["I believe every room sounds better with me in it.", "My favourite hobby is cheerful interruption."] },
+            funFact: "Many parakeets are social, vocal birds that quickly learn household routines and sounds.",
+            backstory: "Was surrendered with a tiny bell toy and now performs whenever anyone opens a notebook."
+        },
+        {
+            id: "misty-reindeer",
+            species: "Misty Reindeer",
+            habitat: "Frostbell Vale",
+            defaultName: "Misty",
+            altNames: ["Bell", "Glint", "Pine", "Marlow"],
+            rarity: "ultra-rare",
+            appearance: { kind: "deer", hornKind: "deer", markingKind: "deer", primary: "#b18965", secondary: "#f2d7b6", accent: "#7a5637", eyeColor: "#3d2b1f" },
+            archetype: "Winter Wonder",
+            traits: ["Graceful", "Kind", "Brave"],
+            stats: { cuddliness: 8, playfulness: 7, cleverness: 7, mischief: 2, talk: 4 },
+            phrases: { pet: ["That felt like warm light in cold weather.", "I treasure gentle kindness."], play: ["A crisp little dash sounds lovely.", "I can prance through winter just fine."], treat: ["This snack tastes like a bright day.", "A lovely little reward, thank you."], chat: ["Snow makes every hoofstep feel musical.", "I like paths that glitter a little."] },
+            funFact: "Reindeer have wide hooves that help them travel over snow and soft ground.",
+            backstory: "Joined the haven from a winter wildlife program and still makes every room feel a bit magical."
+        }
+    );
 
     function findPet(id) {
         return PETS.find(p => p.id === id);

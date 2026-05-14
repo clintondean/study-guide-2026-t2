@@ -194,14 +194,46 @@
         `;
         document.body.appendChild(popDiv);
 
-        // Force layout then add visible class for transition
-        requestAnimationFrame(() => popDiv.classList.add("cat-pop-show"));
+        let removed = false;
+        let leaveTimer = null;
+        let removeTimer = null;
+        const onDone = typeof opts.onDone === "function" ? opts.onDone : null;
 
-        setTimeout(() => {
+        function finish() {
+            if (removed) return;
+            removed = true;
+            if (leaveTimer) clearTimeout(leaveTimer);
+            if (removeTimer) clearTimeout(removeTimer);
+            if (popDiv.isConnected) popDiv.remove();
+            if (onDone) onDone();
+        }
+
+        function dismiss(immediate) {
+            if (removed) return;
+            if (leaveTimer) {
+                clearTimeout(leaveTimer);
+                leaveTimer = null;
+            }
+            if (immediate) {
+                finish();
+                return;
+            }
+            if (removeTimer) return;
             popDiv.classList.remove("cat-pop-show");
             popDiv.classList.add("cat-pop-leave");
-            setTimeout(() => popDiv.remove(), 500);
+            removeTimer = setTimeout(finish, 500);
+        }
+
+        // Force layout then add visible class for transition
+        requestAnimationFrame(() => {
+            if (!removed) popDiv.classList.add("cat-pop-show");
+        });
+
+        leaveTimer = setTimeout(() => {
+            dismiss(false);
         }, duration);
+
+        return { dismiss };
     }
 
     function pickTheme() {

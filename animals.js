@@ -93,12 +93,43 @@
             </div>
         `;
         document.body.appendChild(popDiv);
-        requestAnimationFrame(() => popDiv.classList.add("cat-pop-show"));
-        setTimeout(() => {
+        let removed = false;
+        let leaveTimer = null;
+        let removeTimer = null;
+        const onDone = typeof opts.onDone === "function" ? opts.onDone : null;
+
+        function finish() {
+            if (removed) return;
+            removed = true;
+            if (leaveTimer) clearTimeout(leaveTimer);
+            if (removeTimer) clearTimeout(removeTimer);
+            if (popDiv.isConnected) popDiv.remove();
+            if (onDone) onDone();
+        }
+
+        function dismiss(immediate) {
+            if (removed) return;
+                clearTimeout(leaveTimer);
+                leaveTimer = null;
+            }
+            if (immediate) {
+                finish();
+                return;
+            }
+            if (removeTimer) return;
             popDiv.classList.remove("cat-pop-show");
             popDiv.classList.add("cat-pop-leave");
-            setTimeout(() => popDiv.remove(), 500);
+            removeTimer = setTimeout(finish, 500);
+        }
+
+        requestAnimationFrame(() => {
+            if (!removed) popDiv.classList.add("cat-pop-show");
+        });
+        leaveTimer = setTimeout(() => {
+            dismiss(false);
         }, duration);
+
+        return { dismiss };
     }
 
     function celebrate(scoreRatio) {

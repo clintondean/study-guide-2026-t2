@@ -277,6 +277,8 @@
     }
 
     let state = loadState();
+    let activeThemeAnnouncement = null;
+    let lastRouteKey = null;
 
     /* ---------- Helpers ---------- */
 
@@ -460,11 +462,32 @@
     }
 
     function mascotPopIn(opts) {
-        activeMascotApi().popIn(opts || {});
+        return activeMascotApi().popIn(opts || {});
     }
 
     function mascotCelebrate(scoreRatio) {
         return activeMascotApi().celebrate(scoreRatio);
+    }
+
+    function clearThemeAnnouncement(immediate) {
+        if (!activeThemeAnnouncement || !activeThemeAnnouncement.dismiss) return;
+        const announcement = activeThemeAnnouncement;
+        activeThemeAnnouncement = null;
+        announcement.dismiss(!!immediate);
+    }
+
+    function announceThemeChange(message) {
+        let controller = null;
+        clearThemeAnnouncement(true);
+        controller = mascotPopIn({
+            expression: "proud",
+            message,
+            duration: 2200,
+            onDone: () => {
+                if (activeThemeAnnouncement === controller) activeThemeAnnouncement = null;
+            }
+        }) || null;
+        activeThemeAnnouncement = controller;
     }
 
     function activeThemeConfig() {
@@ -697,9 +720,21 @@
     }
 
     function setThemePreference(themeId) {
-        state.settings.themePreference = normalizeThemePreference(themeId);
+        const nextTheme = normalizeThemePreference(themeId);
+        if (state.settings.themePreference === nextTheme) return false;
+        state.settings.themePreference = nextTheme;
         saveState();
         applyFooterCaption();
+        return true;
+    }
+
+    function setVisualTheme(themeId) {
+        const nextTheme = normalizeVisualTheme(themeId);
+        if (currentVisualTheme() === nextTheme) return false;
+        state.settings.visualTheme = nextTheme;
+        saveState();
+        applyVisualTheme();
+        return true;
     }
 
     function resolveProfileDraft(draft) {
@@ -794,7 +829,12 @@
 
     function render() {
         const route = parseRoute();
+        const routeKey = route.join("/");
         const root = $("#app");
+        if (lastRouteKey !== null && routeKey !== lastRouteKey) {
+            clearThemeAnnouncement(true);
+        }
+        lastRouteKey = routeKey;
         // Stop any park timers if we're leaving the park-play view
         const goingToParkPlay = route[0] === "clan" && route[1] === "park" && route[2] === "play";
         if (!goingToParkPlay && window.Park && window.Park.stop) window.Park.stop();
@@ -2502,6 +2542,205 @@
 
     /* ---------- Progress view ---------- */
 
+    let progressCalendarMonthKey = "";
+
+    function pluralize(count, singular, plural) {
+        return count === 1 ? singular : (plural || singular + "s");
+    }
+
+    function calendarDateKey(date) {
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, "0"),
+            String(date.getDate()).padStart(2, "0")
+        ].join("-");
+    }
+
+    function calendarMonthKey(date) {
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, "0")
+        ].join("-");
+    }
+
+    function parseCalendarMonthKey(monthKey) {
+        const match = /^(\d{4})-(\d{2})$/.exec(String(monthKey || ""));
+        if (!match) return null;
+        const year = parseInt(match[1], 10);
+        const monthIndex = parseInt(match[2], 10) - 1;
+        if (monthIndex < 0 || monthIndex > 11) return null;
+        return { year, monthIndex };
+    }
+
+    function formatCalendarMonthLabel(monthKey) {
+        const parsed = parseCalendarMonthKey(monthKey);
+        if (!parsed) return "";
+        return new Date(parsed.year, parsed.monthIndex, 1).toLocaleDateString(undefined, {
+            month: "long",
+            year: "numeric"
+        });
+    }
+
+    function quizSessionDisplay(subj, entry) {
+        const mode = entry && entry.mode ? entry.mode : "practice";
+        const exam = subj ? findExam(subj, mode) : null;
+        if (exam) {
+            return {
+                kind: exam.isMock ? "Mock exam" : "Practice quiz",
+                label: exam.name || mode
+            };
+        }
+        if (mode === "mixed") return { kind: "Quiz", label: "Mixed practice" };
+        if (mode === "mcq") return { kind: "Quiz", label: "Multiple choice" };
+        if (mode === "short") return { kind: "Quiz", label: "Short answer" };
+        if (mode === "long") return { kind: "Quiz", label: "Extended response" };
+        if (subj && mode.indexOf("topic-") === 0) {
+            const topicId = mode.slice("topic-".length);
+            const topic = (subj.topics || []).find(item => item.id === topicId);
+            if (topic) return { kind: "Quiz", label: topic.name };
+        }
+        return { kind: "Quiz", label: mode };
+    }
+
+    function buildProgressCalendar(subjectIds) {
+        const sessions = [];
+        subjectIds.forEach(subjectId => {
+            const subj = window.SUBJECT_DATA[subjectId];
+            const subjState = state.subjects[subjectId] || { quizSessions: [] };
+            (subjState.quizSessions || []).forEach(entry => {
+                if (!entry || typeof entry.mode !== "string") return;
+                const isPractice = entry.mode.indexOf("exam-") === 0;
+                const isMock = entry.mode.indexOf("mock-") === 0;
+                if (!isPractice && !isMock) return;
+                const when = new Date(entry.date || "");
+                if (Number.isNaN(when.getTime())) return;
+                const exam = subj ? findExam(subj, entry.mode) : null;
+                sessions.push({
+                    kind: isMock ? "mock" : "practice",
+                    date: when,
+                    dateKey: calendarDateKey(when),
+                    monthKey: calendarMonthKey(when),
+                    label: exam && exam.name ? exam.name : entry.mode,
+                    subjectName: subj ? subj.name : subjectId
+                });
+            });
+        });
+        sessions.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        const currentMonth = calendarMonthKey(new Date());
+        const monthKeys = Array.from(new Set(sessions.map(item => item.monthKey).concat(currentMonth))).sort();
+        const countsByDate = Object.create(null);
+        const totals = { practice: 0, mock: 0 };
+
+        sessions.forEach(item => {
+            const bucket = countsByDate[item.dateKey] || (countsByDate[item.dateKey] = { practice: 0, mock: 0, total: 0 });
+            bucket[item.kind]++;
+            bucket.total++;
+            totals[item.kind]++;
+        });
+
+        return {
+            countsByDate,
+            monthKeys,
+            totals,
+            defaultMonthKey: sessions.some(item => item.monthKey === currentMonth) || !sessions.length
+                ? currentMonth
+                : monthKeys[monthKeys.length - 1]
+        };
+    }
+
+    function buildCalendarMonthData(calendar, monthKey) {
+        const parsed = parseCalendarMonthKey(monthKey);
+        if (!parsed) return null;
+
+        const firstDay = new Date(parsed.year, parsed.monthIndex, 1);
+        const leadingPads = (firstDay.getDay() + 6) % 7;
+        const daysInMonth = new Date(parsed.year, parsed.monthIndex + 1, 0).getDate();
+        const todayKey = calendarDateKey(new Date());
+        const cells = [];
+        const totals = { practice: 0, mock: 0 };
+
+        for (let i = 0; i < leadingPads; i++) cells.push({ isPad: true });
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(parsed.year, parsed.monthIndex, day);
+            const dateKey = calendarDateKey(date);
+            const counts = calendar.countsByDate[dateKey] || { practice: 0, mock: 0, total: 0 };
+            totals.practice += counts.practice;
+            totals.mock += counts.mock;
+            cells.push({
+                day,
+                dateKey,
+                counts,
+                isToday: dateKey === todayKey
+            });
+        }
+
+        while (cells.length % 7) cells.push({ isPad: true });
+
+        return {
+            monthKey,
+            label: formatCalendarMonthLabel(monthKey),
+            totals,
+            cells
+        };
+    }
+
+    function renderProgressCalendar(calendar, monthKey) {
+        const month = buildCalendarMonthData(calendar, monthKey);
+        if (!month) return "";
+
+        const monthIndex = calendar.monthKeys.indexOf(monthKey);
+        const summaryText = (month.totals.practice || month.totals.mock)
+            ? `${month.totals.practice} ${pluralize(month.totals.practice, "practice quiz", "practice quizzes")} and ${month.totals.mock} ${pluralize(month.totals.mock, "mock exam")} completed in ${month.label}.`
+            : `No practice quizzes or mock exams completed in ${month.label} yet.`;
+
+        return `
+            <section class="progress-calendar-card">
+                <div class="progress-calendar-header">
+                    <div>
+                        <h2>Study calendar</h2>
+                        <p>${escapeHtml(summaryText)}</p>
+                    </div>
+                    <div class="progress-calendar-nav" aria-label="Calendar month navigation">
+                        <button type="button" class="ghost-btn progress-calendar-nav-btn" id="progress-calendar-prev" ${monthIndex <= 0 ? "disabled" : ""} aria-label="Show previous month">←</button>
+                        <div class="progress-calendar-month">${escapeHtml(month.label)}</div>
+                        <button type="button" class="ghost-btn progress-calendar-nav-btn" id="progress-calendar-next" ${monthIndex >= calendar.monthKeys.length - 1 ? "disabled" : ""} aria-label="Show next month">→</button>
+                    </div>
+                </div>
+                <div class="progress-calendar-legend">
+                    <span class="progress-calendar-pill is-practice">🎯 Practice ${month.totals.practice}</span>
+                    <span class="progress-calendar-pill is-mock">📝 Mock ${month.totals.mock}</span>
+                </div>
+                <div class="progress-calendar-weekdays" aria-hidden="true">
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                    <span>Sat</span>
+                    <span>Sun</span>
+                </div>
+                <div class="progress-calendar-days">
+                    ${month.cells.map(cell => {
+                        if (cell.isPad) return `<div class="progress-calendar-pad" aria-hidden="true"></div>`;
+                        const parts = cell.dateKey.split("-").map(Number);
+                        const dayTitle = `${new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}: ${cell.counts.practice} ${pluralize(cell.counts.practice, "practice quiz", "practice quizzes")}, ${cell.counts.mock} ${pluralize(cell.counts.mock, "mock exam")}`;
+                        return `
+                            <div class="progress-calendar-day ${cell.counts.total ? "has-activity" : ""} ${cell.isToday ? "is-today" : ""}" title="${escapeHtml(dayTitle)}">
+                                <div class="progress-calendar-date">${cell.day}</div>
+                                <div class="progress-calendar-counts">
+                                    ${cell.counts.practice ? `<span class="progress-calendar-chip is-practice">🎯 ${cell.counts.practice}</span>` : ""}
+                                    ${cell.counts.mock ? `<span class="progress-calendar-chip is-mock">📝 ${cell.counts.mock}</span>` : ""}
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </section>
+        `;
+    }
+
     function renderProgress(root) {
         const liveIds = liveSelectedSubjectIds();
         if (!liveIds.length) {
@@ -2519,7 +2758,10 @@
             const subjState = state.subjects[id];
             const recent = subjState.quizSessions.slice(-3).reverse();
             const recentHtml = recent.length
-                ? recent.map(s => `<li>${escapeHtml(s.mode)} — ${s.score}/${s.total} · ${new Date(s.date).toLocaleString()}</li>`).join("")
+                ? recent.map(s => {
+                    const display = quizSessionDisplay(subj, s);
+                    return `<li>${escapeHtml(display.kind)} — ${escapeHtml(display.label)} · ${s.score}/${s.total} · ${new Date(s.date).toLocaleString()}</li>`;
+                }).join("")
                 : "<li class='muted'>No sessions yet.</li>";
 
             return `
@@ -2541,13 +2783,39 @@
             `;
         }).join("");
         const summary = selectedStudySummary();
+        const calendar = buildProgressCalendar(liveIds);
+        if (!progressCalendarMonthKey || calendar.monthKeys.indexOf(progressCalendarMonthKey) === -1) {
+            progressCalendarMonthKey = calendar.defaultMonthKey;
+        }
 
         root.innerHTML = `
             <a class="back-link" href="#/">← Home</a>
             <h1>My progress</h1>
             <p>${summary.attempted} questions answered · ${pct(summary.correct, summary.attempted)}% correct overall · best streak ${state.stats.bestStreak} 🔥</p>
+            ${renderProgressCalendar(calendar, progressCalendarMonthKey)}
             <div class="progress-grid">${rows}</div>
         `;
+
+        const prevBtn = document.getElementById("progress-calendar-prev");
+        const nextBtn = document.getElementById("progress-calendar-next");
+        if (prevBtn) {
+            prevBtn.addEventListener("click", () => {
+                const idx = calendar.monthKeys.indexOf(progressCalendarMonthKey);
+                if (idx > 0) {
+                    progressCalendarMonthKey = calendar.monthKeys[idx - 1];
+                    renderProgress(root);
+                }
+            });
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener("click", () => {
+                const idx = calendar.monthKeys.indexOf(progressCalendarMonthKey);
+                if (idx >= 0 && idx < calendar.monthKeys.length - 1) {
+                    progressCalendarMonthKey = calendar.monthKeys[idx + 1];
+                    renderProgress(root);
+                }
+            });
+        }
     }
 
     /* ---------- Cat Clan ---------- */
@@ -4210,28 +4478,20 @@
             }
         );
 
-        $$("[data-settings-theme]").forEach(btn => {
+        $$("[data-settings-theme]", root).forEach(btn => {
             btn.addEventListener("click", () => {
-                setThemePreference(btn.dataset.settingsTheme);
+                const nextTheme = normalizeThemePreference(btn.dataset.settingsTheme);
+                if (!setThemePreference(nextTheme)) return;
                 renderSettings(root);
-                mascotPopIn({
-                    expression: "proud",
-                    message: btn.dataset.settingsTheme === "animals" ? "Animals theme activated!" : "Cats theme activated!",
-                    duration: 2200
-                });
+                announceThemeChange(nextTheme === "animals" ? "Animals theme activated!" : "Cats theme activated!");
             });
         });
-        $$("[data-visual-theme]").forEach(btn => {
+        $$("[data-visual-theme]", root).forEach(btn => {
             btn.addEventListener("click", () => {
-                state.settings.visualTheme = normalizeVisualTheme(btn.dataset.visualTheme);
-                saveState();
-                applyVisualTheme();
+                const nextTheme = normalizeVisualTheme(btn.dataset.visualTheme);
+                if (!setVisualTheme(nextTheme)) return;
                 renderSettings(root);
-                mascotPopIn({
-                    expression: "proud",
-                    message: `${visualThemeMeta(btn.dataset.visualTheme).label} theme activated!`,
-                    duration: 2200
-                });
+                announceThemeChange(`${visualThemeMeta(nextTheme).label} theme activated!`);
             });
         });
 

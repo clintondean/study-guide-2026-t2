@@ -35,6 +35,7 @@
     const BONUS_FRUIT_MS = 9000;
     const BONUS_FRUIT_THRESHOLDS = [0.72, 0.34];
     const GHOST_WAKE_DELAYS_MS = [1200, 2600, 4200, 5800];
+    const PACE_SCALE = 2;
 
     const DIRS = {
         left: { row: 0, col: -1, angle: Math.PI },
@@ -406,12 +407,12 @@
     }
 
     function playerStepMs() {
-        return Math.max(88, BASE_PLAYER_STEP_MS - (state.level - 1) * 6);
+        return Math.max(88, BASE_PLAYER_STEP_MS - (state.level - 1) * 6) * PACE_SCALE;
     }
 
     function ghostStepMs(now) {
-        if (isFrightened(now)) return Math.max(116, FRIGHTENED_GHOST_STEP_MS - (state.level - 1) * 4);
-        return Math.max(96, BASE_GHOST_STEP_MS - (state.level - 1) * 4);
+        if (isFrightened(now)) return Math.max(116, FRIGHTENED_GHOST_STEP_MS - (state.level - 1) * 4) * PACE_SCALE;
+        return Math.max(96, BASE_GHOST_STEP_MS - (state.level - 1) * 4) * PACE_SCALE;
     }
 
     function isFrightened(now) {

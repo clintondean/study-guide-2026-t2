@@ -3309,7 +3309,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 
 .danger-noodle-layout,
 .catanoid-layout,
-.cat-man-layout {
+.cat-man-layout,
+.meowterbike-layout {
     display: grid;
     grid-template-columns: minmax(0, auto) minmax(260px, 300px);
     gap: 1rem;
@@ -3318,7 +3319,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 
 .danger-noodle-panel,
 .catanoid-panel,
-.cat-man-panel {
+.cat-man-panel,
+.meowterbike-panel {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -3331,27 +3333,31 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 
 .danger-noodle-panel h3,
 .catanoid-panel h3,
-.cat-man-panel h3 {
+.cat-man-panel h3,
+.meowterbike-panel h3 {
     font-size: 1.05rem;
 }
 
 .danger-noodle-panel-copy,
 .catanoid-panel-copy,
-.cat-man-panel-copy {
+.cat-man-panel-copy,
+.meowterbike-panel-copy {
     color: var(--text-muted);
     font-size: 0.88rem;
     line-height: 1.45;
 }
 
 .danger-noodle-status,
-.cat-man-status {
+.cat-man-status,
+.meowterbike-status {
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem;
 }
 
 .danger-noodle-chip,
-.cat-man-chip {
+.cat-man-chip,
+.meowterbike-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
@@ -3366,7 +3372,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 
 .danger-noodle-chip.is-neutral,
 .danger-noodle-chip.is-quiet,
-.cat-man-chip.is-neutral {
+.cat-man-chip.is-neutral,
+.meowterbike-chip.is-neutral {
     color: var(--text-muted);
 }
 
@@ -3386,6 +3393,36 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     background: rgba(255, 127, 81, 0.18);
     border-color: rgba(255, 127, 81, 0.42);
     color: #c65327;
+}
+
+.meowterbike-chip.is-speed {
+    background: rgba(244, 162, 97, 0.18);
+    border-color: rgba(244, 162, 97, 0.42);
+    color: #b65a21;
+}
+
+.meowterbike-chip.is-place {
+    background: rgba(61, 169, 252, 0.18);
+    border-color: rgba(61, 169, 252, 0.42);
+    color: #1f73b2;
+}
+
+.meowterbike-chip.is-danger {
+    background: rgba(255, 127, 81, 0.18);
+    border-color: rgba(255, 127, 81, 0.42);
+    color: #c65327;
+}
+
+.meowterbike-chip.is-air {
+    background: rgba(155, 93, 229, 0.18);
+    border-color: rgba(155, 93, 229, 0.42);
+    color: #7040b8;
+}
+
+.meowterbike-chip.is-cool {
+    background: rgba(95, 207, 191, 0.18);
+    border-color: rgba(95, 207, 191, 0.42);
+    color: #13796d;
 }
 
 .danger-noodle-chip.is-super {
@@ -3424,7 +3461,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 
 .catanoid-legend,
-.cat-man-legend {
+.cat-man-legend,
+.meowterbike-legend {
     display: grid;
     gap: 0.55rem;
 }
@@ -3460,6 +3498,16 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     padding: 0.55rem 0.7rem;
 }
 
+.meowterbike-legend-item {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 0.65rem;
+    align-items: start;
+    background: var(--surface-soft);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+}
+
 .catanoid-legend-item.is-good {
     border-color: color-mix(in srgb, var(--good) 18%, var(--border) 82%);
 }
@@ -3483,6 +3531,11 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     font-size: 0.9rem;
 }
 
+.meowterbike-legend-item strong {
+    display: block;
+    font-size: 0.9rem;
+}
+
 .danger-noodle-legend-item span {
     color: var(--text-muted);
     font-size: 0.78rem;
@@ -3494,6 +3547,11 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 
 .cat-man-legend-item span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.meowterbike-legend-item span {
     color: var(--text-muted);
     font-size: 0.78rem;
 }
@@ -3546,6 +3604,95 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     background: #56cfe1;
 }
 
+.meowterbike-swatch {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-top: 0.25rem;
+    background: #c49a6c;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+.meowterbike-legend-item.is-ramp .meowterbike-swatch {
+    background: #ffd166;
+}
+
+.meowterbike-legend-item.is-mud .meowterbike-swatch {
+    background: #5b3a29;
+}
+
+.meowterbike-legend-item.is-cool .meowterbike-swatch {
+    background: #3da9fc;
+}
+
+.meowterbike-legend-item.is-tight .meowterbike-swatch {
+    background: #d2691e;
+}
+
+.meowterbike-track-board {
+    display: grid;
+    gap: 0.65rem;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 0.9rem;
+}
+
+.meowterbike-board-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.meowterbike-board-header strong {
+    font-size: 0.94rem;
+}
+
+.meowterbike-board-header span {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.meowterbike-board-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.35rem 0.8rem;
+    align-items: center;
+    font-size: 0.84rem;
+}
+
+.meowterbike-board-grid span {
+    color: var(--text-muted);
+}
+
+.meowterbike-board-grid strong {
+    color: var(--text);
+}
+
+.meowterbike-touch {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+    max-width: 520px;
+    margin: 0.7rem auto 0;
+}
+
+.meowterbike-touch button {
+    min-height: 52px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: var(--radius);
+    font-weight: 700;
+    box-shadow: var(--shadow);
+}
+
+.meowterbike-touch button:active {
+    transform: translateY(1px);
+}
+
 .danger-noodle-normal .danger-noodle-swatch { background: #ff6b6b; }
 .danger-noodle-super .danger-noodle-swatch { background: #ffd166; }
 .danger-noodle-turbo .danger-noodle-swatch { background: #ff8c42; }
@@ -3584,13 +3731,15 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 @media (max-width: 980px) {
     .danger-noodle-layout,
     .catanoid-layout,
-    .cat-man-layout {
+    .cat-man-layout,
+    .meowterbike-layout {
         grid-template-columns: 1fr;
     }
 
     .danger-noodle-panel,
     .catanoid-panel,
-    .cat-man-panel {
+    .cat-man-panel,
+    .meowterbike-panel {
         order: 2;
     }
 }
@@ -3599,6 +3748,9 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     .break-canvas-wrap { padding: 4px; }
     .break-game-stats { grid-template-columns: repeat(2, 1fr); }
     .danger-noodle-touch {
+        gap: 0.45rem;
+    }
+    .meowterbike-touch {
         gap: 0.45rem;
     }
 }

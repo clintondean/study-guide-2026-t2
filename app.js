@@ -236,7 +236,8 @@
                 invadersHighScore: 0,
                 catanoidHighScore: 0,
                 dangerNoodleHighScore: 0,
-                catManHighScore: 0
+                catManHighScore: 0,
+                meowterbikeBestTimeMs: null
             }
         };
     }
@@ -1073,6 +1074,7 @@
         if (window.Catanoid && window.Catanoid.stop) window.Catanoid.stop();
         if (window.DangerNoodle && window.DangerNoodle.stop) window.DangerNoodle.stop();
         if (window.CatMan && window.CatMan.stop) window.CatMan.stop();
+        if (window.Meowterbike && window.Meowterbike.stop) window.Meowterbike.stop();
         // If leaving the break section entirely, end the shared session.
         if (!goingToBreak && window.BreakSession) window.BreakSession.end();
         if (!goingToBreak && window._breakLockoutTimer) {
@@ -1098,6 +1100,7 @@
             if (route[1] === "catanoid") return renderBreakGame(root, "catanoid");
             if (route[1] === "danger-noodle") return renderBreakGame(root, "danger-noodle");
             if (route[1] === "cat-man") return renderBreakGame(root, "cat-man");
+            if (route[1] === "meowterbike") return renderBreakGame(root, "meowterbike");
             return renderBreakHub(root);
         }
         if (route[0] === "clan") {
@@ -3732,25 +3735,57 @@
             blurb: "Chomp treats, dodge rival cats, and pounce on bonus snacks.",
             color: "#2f8fce",
             highKey: "catManHighScore"
+        },
+        {
+            id: "meowterbike",
+            name: "Meowterbike",
+            icon: "🏍️",
+            blurb: "Rip through cat-cross tracks, dodge rivals, and manage turbo heat.",
+            color: "#f4a261",
+            highKey: "meowterbikeBestTimeMs",
+            bestMode: "min",
+            bestLabel: "🏁 Tour best",
+            emptyBest: "--:--.---",
+            formatBest: value => formatRaceTime(value),
+            newBestMessage: "New best tour time! 🏁"
         }
     ];
 
     function highScoreFor(gameId) {
         const game = BREAK_GAMES.find(g => g.id === gameId);
         if (!game) return 0;
-        return (state.breaks && state.breaks[game.highKey]) || 0;
+        if (!state.breaks) return game.bestMode === "min" ? null : 0;
+        return state.breaks[game.highKey];
+    }
+
+    function formatRaceTime(ms) {
+        if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return "--:--.---";
+        const minutes = Math.floor(ms / 60000);
+        const seconds = Math.floor((ms % 60000) / 1000);
+        const millis = Math.floor(ms % 1000);
+        return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+    }
+
+    function formatBreakBest(game, value) {
+        if (!game) return "0";
+        if (typeof game.formatBest === "function") return game.formatBest(value);
+        return typeof value === "number" ? String(value) : "0";
     }
 
     function setHighScoreFor(gameId, score) {
         const game = BREAK_GAMES.find(g => g.id === gameId);
         if (!game) return;
         state.breaks = state.breaks || {};
-        if (score > (state.breaks[game.highKey] || 0)) {
+        const previous = state.breaks[game.highKey];
+        const isBetter = game.bestMode === "min"
+            ? (typeof score === "number" && score > 0 && (typeof previous !== "number" || previous <= 0 || score < previous))
+            : score > (previous || 0);
+        if (isBetter) {
             state.breaks[game.highKey] = score;
             saveState();
             mascotPopIn({
                 expression: "cheering",
-                message: "New high score! 🏆",
+                message: game.newBestMessage || "New high score! 🏆",
                 duration: 3000, side: "right"
             });
         }
@@ -3769,7 +3804,7 @@
                 <div class="break-game-icon">${g.icon}</div>
                 <h3>${escapeHtml(g.name)}</h3>
                 <p>${escapeHtml(g.blurb)}</p>
-                <div class="break-game-high">🏆 Best: <strong>${highScoreFor(g.id)}</strong></div>
+                <div class="break-game-high">${escapeHtml(g.bestLabel || "🏆 Best")}: <strong>${escapeHtml(formatBreakBest(g, highScoreFor(g.id)))}</strong></div>
             </a>
         `).join("");
         const hubAction = breakIsActive
@@ -3851,6 +3886,7 @@
         if (gameId === "catanoid") return window.Catanoid.start(root, opts);
         if (gameId === "danger-noodle") return window.DangerNoodle.start(root, opts);
         if (gameId === "cat-man") return window.CatMan.start(root, opts);
+        if (gameId === "meowterbike") return window.Meowterbike.start(root, opts);
     }
 
     function renderBreakStartPrompt(root, gameId) {
@@ -4739,8 +4775,10 @@
         const tickets = cs.claimTickets || 0;
         const animalTickets = animalProgress.claimTickets || 0;
         const sparklePotions = sparklePotionCount();
-        const breakHighs = BREAK_GAMES.map(game => (state.breaks && state.breaks[game.highKey]) || 0);
-        const highScore = breakHighs.length ? Math.max.apply(null, breakHighs) : 0;
+        const savedBreakBestCount = BREAK_GAMES.filter(game => {
+            const value = state.breaks && state.breaks[game.highKey];
+            return typeof value === "number" && value > 0;
+        }).length;
         const sessions = STATE_SUBJECTS.reduce((n, id) => n + (state.subjects[id].quizSessions || []).length, 0);
         const namedCats = catCompanionEntries().filter(c => {
             const breed = catSpecFor(catEntryId(c));
@@ -4767,7 +4805,7 @@
                     <li><span>🦊</span> Your <strong>${animalCount}</strong> animal companion${animalCount === 1 ? "" : "s"} and all their happiness</li>
                     <li><span>🎟️</span> ${animalTickets} unspent Pet Ticket${animalTickets === 1 ? "" : "s"}</li>
                     <li><span>✨</span> ${sparklePotions} Sparkle Potion${sparklePotions === 1 ? "" : "s"}</li>
-                    <li><span>🐱</span> All break-game high scores, including Cat-man (best: <strong>${highScore}</strong>)</li>
+                    <li><span>🐱</span> <strong>${savedBreakBestCount}</strong> saved break-game best${savedBreakBestCount === 1 ? "" : "s"}, including Meowterbike tour times</li>
                     <li><span>🔥</span> Your current and best streaks</li>
                     <li><span>⏱️</span> Break cooldown timer</li>
                 </ul>

@@ -13,6 +13,12 @@
     const TRACK_H = 248;
     const LANES = 4;
     const LANE_H = TRACK_H / LANES;
+    const TOTAL_RIDERS = 5;
+    const TRACK_LENGTH_SCALE = 10;
+    const SPEED_SCALE = 5;
+    const TRACK_TIME_SCALE = TRACK_LENGTH_SCALE / SPEED_SCALE;
+    const COUNTDOWN_MS = 3000;
+    const GO_MS = 600;
     const PLAYER_SCREEN_X = 190;
     const PX_PER_UNIT = 0.78;
     const PLAYER_BASE_ACCEL = 28;
@@ -35,8 +41,8 @@
     const AIR_PITCH_RATE = 2.6;
     const PITCH_SAFE_MIN = -0.28;
     const PITCH_SAFE_MAX = 0.95;
-    const COLLISION_DISTANCE = 12;
-    const HAZARD_LOOKAHEAD = 120;
+    const COLLISION_DISTANCE = 12 * SPEED_SCALE;
+    const HAZARD_LOOKAHEAD = 120 * TRACK_LENGTH_SCALE;
     const BONUS_TARGET_DELTA_MS = 8000;
     const TRACK_POINTS = [300, 450, 650, 900, 1200];
 
@@ -129,9 +135,9 @@
         state.result = null;
         state.finishedTour = false;
         state.player = freshBike(RIDERS[0], 1, true);
-        state.rivals = RIDERS.slice(1).map(function (rider, riderIndex) {
+        state.rivals = RIDERS.slice(1, TOTAL_RIDERS).map(function (rider, riderIndex) {
             const bike = freshBike(rider, riderIndex % LANES, false);
-            bike.distance = -18 - riderIndex * 11;
+            bike.distance = (-18 - riderIndex * 11) * TRACK_LENGTH_SCALE;
             bike.aiTurboBias = rider.turboBias;
             bike.aiLaneBias = rider.laneBias;
             bike.maxSpeed = CPU_MAX_SPEED + track.cpuSpeedBias + riderIndex * 0.7;
@@ -142,8 +148,11 @@
         state.cameraDistance = 0;
         state.trackEventHits = Object.create(null);
         state.lastFrameAt = now;
+        state.countdownStartedAt = now;
+        state.countdownEndsAt = now + COUNTDOWN_MS + GO_MS;
+        state.countdownLabel = "";
         state.overlayLocked = false;
-        hideOverlay();
+        renderCountdownOverlay(now);
         updateHud();
         updateStatus(now);
         renderTimer();
@@ -194,7 +203,7 @@
             <div class="break-game-stats">
                 <div class="tetris-stat tetris-highscore"><span>🏁 Tour best</span><strong id="meowterbike-best">${formatRaceTime(getHighScore())}</strong></div>
                 <div class="tetris-stat"><span>Track</span><strong id="meowterbike-track">1 / ${TRACKS.length}</strong></div>
-                <div class="tetris-stat"><span>Place</span><strong id="meowterbike-place">6th</strong></div>
+                <div class="tetris-stat"><span>Place</span><strong id="meowterbike-place">${ordinal(TOTAL_RIDERS)}</strong></div>
                 <div class="tetris-stat"><span>Track time</span><strong id="meowterbike-track-time">0:00.000</strong></div>
                 <div class="tetris-stat"><span>Tour time</span><strong id="meowterbike-tour-time">0:00.000</strong></div>
                 <div class="tetris-stat"><span>Heat</span><strong id="meowterbike-heat">0%</strong></div>
@@ -339,18 +348,30 @@
         state.lastFrameAt = now;
 
         if (!state.paused && !state.result) {
-            state.trackTimeMs += dt;
-            updateBike(state.player, dt, now, true);
-            state.rivals.forEach(function (rival) {
-                planRival(rival, now);
-                updateBike(rival, dt, now, false);
-            });
-            handleCollisions(now);
-            updateCamera();
-            updatePopups(dt);
-            updateHud();
-            updateStatus(now);
-            maybeFinishTrack(now);
+            if (isCountdownActive(now)) {
+                renderCountdownOverlay(now);
+                updateHud();
+                updateStatus(now);
+            } else {
+                if (state.countdownEndsAt) {
+                    state.countdownEndsAt = 0;
+                    state.countdownStartedAt = 0;
+                    state.countdownLabel = "";
+                    hideOverlay();
+                }
+                state.trackTimeMs += dt;
+                updateBike(state.player, dt, now, true);
+                state.rivals.forEach(function (rival) {
+                    planRival(rival, now);
+                    updateBike(rival, dt, now, false);
+                });
+                handleCollisions(now);
+                updateCamera();
+                updatePopups(dt);
+                updateHud();
+                updateStatus(now);
+                maybeFinishTrack(now);
+            }
         }
 
         draw(now);
@@ -401,11 +422,11 @@
         if (bike.airborne) {
             updateAirPitch(bike, controls, dt, isPlayer);
             const pitchBonus = 1 + Math.max(0, bike.pitch) * 0.16 - Math.max(0, -bike.pitch) * 0.08;
-            bike.distance += bike.speed * dt / 1000 * pitchBonus;
+            bike.distance += bike.speed * dt / 1000 * pitchBonus * SPEED_SCALE;
             bike.airElapsed += dt;
             if (bike.airElapsed >= bike.airDuration) landBike(bike, now, isPlayer);
         } else {
-            bike.distance += bike.speed * dt / 1000;
+            bike.distance += bike.speed * dt / 1000 * SPEED_SCALE;
         }
 
         smoothLane(bike, dt);
@@ -515,7 +536,7 @@
             let score = Math.abs(lane - rival.lanePos) * 4 + Math.abs(lane - rival.aiLaneBias * (LANES - 1));
             score += laneHazardScore(lane, rival.distance);
             const nearby = nearestBikeInLane(lane, rival.distance, rival.id);
-            if (nearby && nearby.delta > 0 && nearby.delta < 24) score += 18;
+            if (nearby && nearby.delta > 0 && nearby.delta < 24 * SPEED_SCALE) score += 18;
             laneScores.push({ lane: lane, score: score });
         }
         laneScores.sort(function (a, b) { return a.score - b.score; });
@@ -526,7 +547,7 @@
             rival.targetLane = upcomingLane(upcoming);
         }
 
-        const clearAhead = !upcoming || upcoming.start - rival.distance > 42;
+        const clearAhead = !upcoming || upcoming.start - rival.distance > 42 * TRACK_LENGTH_SCALE;
         if (clearAhead && rival.heat < MAX_HEAT * rival.aiTurboBias && rival.speed > rival.maxSpeed * 0.58) {
             controls.turbo = true;
         }
@@ -695,6 +716,33 @@
         overlay.innerHTML = "";
     }
 
+    function isCountdownActive(now) {
+        return !!state && !!state.countdownEndsAt && now < state.countdownEndsAt;
+    }
+
+    function countdownText(now) {
+        const elapsed = Math.max(0, now - state.countdownStartedAt);
+        if (elapsed < 1000) return "3...";
+        if (elapsed < 2000) return "2...";
+        if (elapsed < 3000) return "1...";
+        return "Go!";
+    }
+
+    function renderCountdownOverlay(now) {
+        const overlay = document.getElementById("meowterbike-overlay");
+        if (!overlay || !state) return;
+        const label = countdownText(now);
+        if (!overlay.hidden && state.countdownLabel === label) return;
+        state.countdownLabel = label;
+        overlay.hidden = false;
+        overlay.innerHTML = `
+            <div class="overlay-card">
+                <h2>${label}</h2>
+                <p>${escapeHtml(state.track.name)}</p>
+            </div>
+        `;
+    }
+
     function togglePause() {
         if (!state || state.result) return;
         state.paused = !state.paused;
@@ -704,7 +752,8 @@
             overlay.hidden = false;
             overlay.innerHTML = `<div class="overlay-card"><h2>Paused</h2><p>Press <kbd>P</kbd> to get the bike purring again.</p></div>`;
         } else {
-            hideOverlay();
+            if (isCountdownActive(performance.now())) renderCountdownOverlay(performance.now());
+            else hideOverlay();
         }
     }
 
@@ -747,7 +796,7 @@
         const host = document.getElementById("meowterbike-status");
         if (!host || !state) return;
         const chips = [];
-        chips.push(chipHtml("meowterbike-chip is-speed", Math.round(state.player.speed) + " mph-ish"));
+        chips.push(chipHtml("meowterbike-chip is-speed", Math.round(state.player.speed * SPEED_SCALE) + " mph-ish"));
         chips.push(chipHtml("meowterbike-chip is-place", ordinal(currentPlace()) + " place"));
         if (state.player.stalledUntil > now) chips.push(chipHtml("meowterbike-chip is-danger", "Engine cooling " + formatSecondsLeft(state.player.stalledUntil, now)));
         else if (state.player.heat > 75) chips.push(chipHtml("meowterbike-chip is-danger", "Heat " + Math.round(state.player.heat) + "%"));
@@ -1248,16 +1297,25 @@
 
     function makeTrack(id, name, blurb, length, bronzeTimeMs, silverTimeMs, goldTimeMs, cpuSpeedBias, obstacles) {
         obstacles = obstacles.map(function (item, index) {
-            return Object.assign({ id: `${id}-${index}` }, item);
+            return Object.assign(
+                {
+                    id: `${id}-${index}`,
+                },
+                item,
+                {
+                    start: item.start * TRACK_LENGTH_SCALE,
+                    length: item.length * TRACK_LENGTH_SCALE
+                }
+            );
         });
         return {
             id: id,
             name: name,
             blurb: blurb,
-            length: length,
-            bronzeTimeMs: bronzeTimeMs,
-            silverTimeMs: silverTimeMs,
-            goldTimeMs: goldTimeMs,
+            length: length * TRACK_LENGTH_SCALE,
+            bronzeTimeMs: bronzeTimeMs * TRACK_TIME_SCALE,
+            silverTimeMs: silverTimeMs * TRACK_TIME_SCALE,
+            goldTimeMs: goldTimeMs * TRACK_TIME_SCALE,
             cpuSpeedBias: cpuSpeedBias,
             obstacles: obstacles
         };

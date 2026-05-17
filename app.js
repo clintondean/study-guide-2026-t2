@@ -4760,7 +4760,6 @@
     /* ---------- Boot ---------- */
 
     function bindGlobalEvents() {
-        $("#reset-progress").addEventListener("click", showResetWarning);
         window.addEventListener("hashchange", render);
         window.addEventListener("DOMContentLoaded", render);
     }

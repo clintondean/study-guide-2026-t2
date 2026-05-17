@@ -32,21 +32,21 @@
     const POWERUP_W = 36, POWERUP_H = 18;
 
     const POWERUPS = {
-        extraBall:  { label: "+1",  emoji: "🐱",  color: "#5fcfbf", text: "Extra ball!",   ms: 0,     good: true },
-        growBall:   { label: "B",   emoji: "💪",  color: "#9b5de5", text: "Big ball!",     ms: 12000, good: true },
-        growPad:    { label: "GROW",emoji: "↔️",  color: "#43aa8b", text: "Big paddle!",   ms: 15000, good: true },
-        shrinkPad:  { label: "SHRK",emoji: "🤏",  color: "#e76f51", text: "Tiny paddle!",  ms: 10000, good: false },
-        slowBall:   { label: "SLOW",emoji: "🐌",  color: "#ffd166", text: "Slow-mo!",      ms: 10000, good: true },
-        extraLife:  { label: "♥",   emoji: "❤️",  color: "#ff5b8b", text: "Extra life!",   ms: 0,     good: true },
-        sticky:     { label: "STKY",emoji: "🪝",  color: "#7d5a3c", text: "Sticky paddle!",ms: 9000,  good: true },
-        pistol:     { label: "PEW", emoji: "🔫",  color: "#3da9fc", text: "Paddle pistol!",ms: 10000, good: true },
-        fastBall:   { label: "FAST",emoji: "⚡",  color: "#ff7f51", text: "Speed up!",     ms: 7000,  good: false }
+        extraBall:   { label: "+1",  emoji: "🐱",  color: "#5fcfbf", text: "Extra ball!",    name: "Extra ball",    description: "Spawn extra balls instantly",          ms: 0,     good: true },
+        growBall:    { label: "B",   emoji: "💪",  color: "#9b5de5", text: "Big ball!",      name: "Big ball",      description: "Larger ball for 12s",                 ms: 12000, good: true },
+        growPad:     { label: "GROW",emoji: "↔️",  color: "#43aa8b", text: "Big paddle!",    name: "Big paddle",    description: "Wider paddle for 15s",               ms: 15000, good: true },
+        shrinkPad:   { label: "SHRK",emoji: "🤏",  color: "#e76f51", text: "Tiny paddle!",   name: "Tiny paddle",   description: "Smaller paddle for 10s",             ms: 10000, good: false },
+        slowBall:    { label: "SLOW",emoji: "🐌",  color: "#ffd166", text: "Slow-mo!",       name: "Slow-mo",       description: "0.6x ball speed for 10s",            ms: 10000, good: true },
+        extraLife:   { label: "♥",   emoji: "❤️",  color: "#ff5b8b", text: "Extra life!",    name: "Extra life",    description: "+1 life instantly",                    ms: 0,     good: true },
+        sticky:      { label: "STKY",emoji: "🪝",  color: "#7d5a3c", text: "Sticky paddle!", name: "Sticky paddle", description: "Catch and relaunch balls for 9s",      ms: 9000,  good: true },
+        pistol:      { label: "PEW", emoji: "🔫",  color: "#3da9fc", text: "Paddle pistol!", name: "Paddle pistol", description: "Dual blasters for 10s",                ms: 10000, good: true },
+        invinciball: { label: "INV", emoji: "✨",  color: "#56cfe1", text: "Invinciball!",   name: "Invinciball",   description: "Smash through bricks for 10s",        ms: 10000, good: true },
+        fastBall:    { label: "FAST",emoji: "⚡",  color: "#ff7f51", text: "Speed up!",      name: "Speed up",      description: "1.5x ball speed for 7s",             ms: 7000,  good: false }
     };
     const POWERUP_KEYS = Object.keys(POWERUPS);
+    const POWERUP_ORDER = ["extraBall", "growBall", "growPad", "sticky", "pistol", "invinciball", "slowBall", "extraLife", "shrinkPad", "fastBall"];
 
     const BASE_BALL_SPEED = 2;
-    const LEVEL_SPEED_STEP = 0.075;
-    const LEVEL_BASE_SPEED_BUMP = 0.1;
     const SPEED_BUMP_PER_PADDLE_HIT = 1.00625; // +0.625% each paddle hit
     const SPEED_BUMP_PER_TICK = 1.0002;        // very slight passive ramp per frame
     const MAX_SPEED_MUL = 2.4;                 // cap
@@ -92,7 +92,7 @@
             <header class="break-game-header">
                 <div>
                     <h1>🧱 Catanoid</h1>
-                    <p class="break-game-blurb">Smash the brick-cats. Move with mouse OR ←/→. Space to launch, or fire a PEW pill paddle pistol when it's active.</p>
+                    <p class="break-game-blurb">Smash the brick-cats. Move with mouse OR ←/→. Space to launch, or fire the PEW pill paddle pistol when it's active.</p>
                 </div>
                 <div class="tetris-timer-wrap">
                     <div class="tetris-timer-label" id="catanoid-timer-label">Time left</div>
@@ -105,9 +105,18 @@
                 <div class="tetris-stat"><span>Level</span><strong id="catanoid-level">1</strong></div>
                 <div class="tetris-stat"><span>Lives</span><strong id="catanoid-lives">3</strong></div>
             </div>
-            <div class="break-canvas-wrap">
-                <canvas id="catanoid-canvas" width="${W}" height="${H}" tabindex="0"></canvas>
-                <div class="break-overlay" id="catanoid-overlay" hidden></div>
+            <div class="catanoid-layout">
+                <div class="break-canvas-wrap">
+                    <canvas id="catanoid-canvas" width="${W}" height="${H}" tabindex="0"></canvas>
+                    <div class="break-overlay" id="catanoid-overlay" hidden></div>
+                </div>
+                <aside class="catanoid-panel">
+                    <h3>Pill box</h3>
+                    <p class="catanoid-panel-copy">Catch a pill to trigger its effect. Timed pills of the same type stack their duration, so two PEW pills last twice as long.</p>
+                    <div class="catanoid-legend">
+                        ${renderPowerupLegend()}
+                    </div>
+                </aside>
             </div>
             <div class="tetris-touch break-touch">
                 <div class="tetris-touch-row">
@@ -116,7 +125,7 @@
                     <button type="button" data-act="right">→</button>
                 </div>
             </div>
-            <p class="break-help">Don't drop the ball! Cleared all bricks? Next level. Catch a PEW pill for 10 seconds of paddle blasters.</p>
+            <p class="break-help">Don't drop the ball! Each new level launches at double the previous level's speed, brick points double with it, and stacked pills extend matching timers.</p>
         `;
         canvas = document.getElementById("catanoid-canvas");
         ctx = canvas.getContext("2d");
@@ -165,7 +174,7 @@
             balls: [makeStartingBall()],
             shots: [],
             powerups: [],
-            mods: { paddleSizeMul: 1, ballSizeMul: 1, ballSpeedMul: 1, sticky: false, pistol: false },
+            mods: { paddleSizeMul: 1, ballSizeMul: 1, ballSpeedMul: 1, sticky: false, pistol: false, invinciball: false },
             modExpiry: {},  // key -> timestamp ms
             popups: [],     // floating text after collecting a powerup
             bricks: spawnBricks(),
@@ -174,7 +183,6 @@
             lives: 3,
             paused: false,
             gameOver: false,
-            baseSpeed: BASE_BALL_SPEED,
             lastPistolShotAt: 0
         });
         if (!state.keyHandler) bindInput();
@@ -193,6 +201,67 @@
 
     function ballRadius() {
         return BALL_R * (state.mods.ballSizeMul || 1);
+    }
+
+    function levelMultiplier(level) {
+        const safeLevel = Math.max(1, level || (state && state.level) || 1);
+        return Math.pow(2, safeLevel - 1);
+    }
+
+    function levelStartSpeed(level) {
+        return BASE_BALL_SPEED * levelMultiplier(level);
+    }
+
+    function brickPoints(row, level) {
+        return ROW_BREEDS[row].points * levelMultiplier(level);
+    }
+
+    function isTimedModActive(key, now) {
+        return !!state.modExpiry[key] && state.modExpiry[key] > now;
+    }
+
+    function extendTimedMod(key, ms, now) {
+        const base = isTimedModActive(key, now) ? state.modExpiry[key] : now;
+        state.modExpiry[key] = base + ms;
+    }
+
+    function scaleLiveBalls(multiplier) {
+        for (const b of state.balls) {
+            b.vx *= multiplier;
+            b.vy *= multiplier;
+        }
+    }
+
+    function clearTimedMod(key) {
+        if (!state.modExpiry[key]) return;
+        deactivateMod(key);
+        delete state.modExpiry[key];
+    }
+
+    function destroyBrick(br, dropQueue) {
+        br.alive = false;
+        state.score += brickPoints(br.row);
+        if (Math.random() < POWERUP_DROP_CHANCE) {
+            dropQueue.push({ x: br.x + BRICK_W / 2, y: br.y + BRICK_H / 2 });
+        }
+    }
+
+    function renderPowerupLegend() {
+        return POWERUP_ORDER.map(renderPowerupLegendItem).join("");
+    }
+
+    function renderPowerupLegendItem(type) {
+        const cfg = POWERUPS[type];
+        if (!cfg) return "";
+        return `
+            <div class="catanoid-legend-item ${cfg.good ? "is-good" : "is-bad"}">
+                <span class="catanoid-swatch" style="background:${cfg.color}">${cfg.label}</span>
+                <div>
+                    <strong>${cfg.name}</strong>
+                    <span>${cfg.description}</span>
+                </div>
+            </div>
+        `;
     }
 
     function spawnBricks() {
@@ -228,7 +297,7 @@
     }
 
     function currentBallSpeed() {
-        return (state.baseSpeed + state.level * LEVEL_SPEED_STEP) * (state.mods.ballSpeedMul || 1);
+        return levelStartSpeed(state.level) * (state.mods.ballSpeedMul || 1);
     }
 
     function handleLaunchOrFire() {
@@ -284,7 +353,7 @@
 
         // ---- Balls ----
         const r = ballRadius();
-        const newBricksToSpawnPowerups = [];
+        const newPowerupDrops = [];
 
         for (const ball of state.balls) {
             if (ball.onPaddle) {
@@ -330,15 +399,13 @@
             }
 
             // Brick collisions
+            const invinciball = !!state.mods.invinciball;
             for (const br of state.bricks) {
                 if (!br.alive) continue;
                 if (ball.x + r > br.x && ball.x - r < br.x + BRICK_W &&
                     ball.y + r > br.y && ball.y - r < br.y + BRICK_H) {
-                    br.alive = false;
-                    state.score += ROW_BREEDS[br.row].points;
-                    if (Math.random() < POWERUP_DROP_CHANCE) {
-                        newBricksToSpawnPowerups.push({ x: br.x + BRICK_W / 2, y: br.y + BRICK_H / 2 });
-                    }
+                    destroyBrick(br, newPowerupDrops);
+                    if (invinciball) continue;
                     const overlapX = Math.min(ball.x - br.x, (br.x + BRICK_W) - ball.x);
                     const overlapY = Math.min(ball.y - br.y, (br.y + BRICK_H) - ball.y);
                     if (overlapX < overlapY) ball.vx *= -1; else ball.vy *= -1;
@@ -347,9 +414,6 @@
             }
         }
 
-        // Spawn powerups for any bricks broken this frame
-        for (const p of newBricksToSpawnPowerups) spawnPowerup(p.x, p.y);
-
         // ---- Paddle pistol shots ----
         for (const shot of state.shots) {
             shot.y -= PISTOL_SHOT_SPEED;
@@ -357,17 +421,16 @@
                 if (!br.alive) continue;
                 if (shot.x + PISTOL_SHOT_W / 2 > br.x && shot.x - PISTOL_SHOT_W / 2 < br.x + BRICK_W &&
                     shot.y + PISTOL_SHOT_H / 2 > br.y && shot.y - PISTOL_SHOT_H / 2 < br.y + BRICK_H) {
-                    br.alive = false;
+                    destroyBrick(br, newPowerupDrops);
                     shot.dead = true;
-                    state.score += ROW_BREEDS[br.row].points;
-                    if (Math.random() < POWERUP_DROP_CHANCE) {
-                        spawnPowerup(br.x + BRICK_W / 2, br.y + BRICK_H / 2);
-                    }
                     break;
                 }
             }
         }
         state.shots = state.shots.filter(shot => !shot.dead && shot.y + PISTOL_SHOT_H / 2 > 0);
+
+        // Spawn powerups for any bricks broken this frame
+        for (const p of newPowerupDrops) spawnPowerup(p.x, p.y);
 
         // ---- Power-up movement & catch ----
         for (const pu of state.powerups) {
@@ -397,6 +460,7 @@
             state.mods.ballSpeedMul = 1;
             state.mods.sticky = false;
             state.mods.pistol = false;
+            state.mods.invinciball = false;
             state.shots = [];
             // Keep paddle size as-is; reset modExpiry for ball ones
             delete state.modExpiry.growBall;
@@ -404,6 +468,7 @@
             delete state.modExpiry.fastBall;
             delete state.modExpiry.sticky;
             delete state.modExpiry.pistol;
+            delete state.modExpiry.invinciball;
         }
 
         // ---- Floating popups ----
@@ -418,7 +483,6 @@
             state.shots = [];
             state.powerups = [];
             state.score += 100;
-            state.baseSpeed += LEVEL_BASE_SPEED_BUMP;
         }
 
         updateHud();
@@ -462,30 +526,54 @@
             return;
         }
         if (type === "extraLife") { state.lives++; return; }
-        if (type === "growBall") { state.mods.ballSizeMul = 1.8; state.modExpiry.growBall = now + cfg.ms; return; }
-        if (type === "growPad")  { state.mods.paddleSizeMul = 1.6; state.modExpiry.growPad = now + cfg.ms; return; }
-        if (type === "shrinkPad"){ state.mods.paddleSizeMul = 0.65; state.modExpiry.shrinkPad = now + cfg.ms; return; }
+        if (type === "growBall") {
+            if (!isTimedModActive(type, now)) state.mods.ballSizeMul = 1.8;
+            extendTimedMod(type, cfg.ms, now);
+            return;
+        }
+        if (type === "growPad")  {
+            clearTimedMod("shrinkPad");
+            if (!isTimedModActive(type, now)) state.mods.paddleSizeMul = 1.6;
+            extendTimedMod(type, cfg.ms, now);
+            return;
+        }
+        if (type === "shrinkPad") {
+            clearTimedMod("growPad");
+            if (!isTimedModActive(type, now)) state.mods.paddleSizeMul = 0.65;
+            extendTimedMod(type, cfg.ms, now);
+            return;
+        }
         if (type === "pistol") {
-            state.mods.pistol = true;
-            state.modExpiry.pistol = now + cfg.ms;
+            if (!isTimedModActive(type, now)) state.mods.pistol = true;
+            extendTimedMod(type, cfg.ms, now);
+            return;
+        }
+        if (type === "invinciball") {
+            if (!isTimedModActive(type, now)) state.mods.invinciball = true;
+            extendTimedMod(type, cfg.ms, now);
             return;
         }
         if (type === "slowBall") {
-            state.mods.ballSpeedMul = 0.6;
-            // Apply immediately to live balls
-            for (const b of state.balls) { b.vx *= 0.6; b.vy *= 0.6; }
-            state.modExpiry.slowBall = now + cfg.ms;
+            clearTimedMod("fastBall");
+            if (!isTimedModActive(type, now)) {
+                state.mods.ballSpeedMul = 0.6;
+                scaleLiveBalls(0.6);
+            }
+            extendTimedMod(type, cfg.ms, now);
             return;
         }
         if (type === "fastBall") {
-            state.mods.ballSpeedMul = 1.5;
-            for (const b of state.balls) { b.vx *= 1.5; b.vy *= 1.5; }
-            state.modExpiry.fastBall = now + cfg.ms;
+            clearTimedMod("slowBall");
+            if (!isTimedModActive(type, now)) {
+                state.mods.ballSpeedMul = 1.5;
+                scaleLiveBalls(1.5);
+            }
+            extendTimedMod(type, cfg.ms, now);
             return;
         }
         if (type === "sticky") {
-            state.mods.sticky = true;
-            state.modExpiry.sticky = now + cfg.ms;
+            if (!isTimedModActive(type, now)) state.mods.sticky = true;
+            extendTimedMod(type, cfg.ms, now);
             return;
         }
     }
@@ -522,6 +610,8 @@
         } else if (key === "pistol") {
             state.mods.pistol = false;
             state.shots = [];
+        } else if (key === "invinciball") {
+            state.mods.invinciball = false;
         }
     }
 
@@ -682,9 +772,15 @@
                 ctx.arc(ball.x, ball.y, r + 6, 0, Math.PI * 2);
                 ctx.fill();
             }
+            ctx.lineWidth = state.mods.invinciball ? 4 : 3;
+            ctx.strokeStyle = state.mods.invinciball ? "rgba(86, 207, 225, 0.95)" : "rgba(19, 38, 77, 0.78)";
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, r + (state.mods.invinciball ? 4 : 2), 0, Math.PI * 2);
+            ctx.stroke();
             window.drawCanvasCat(ctx, ball.x, ball.y, ballSize, {
-                primary: state.mods.ballSizeMul > 1 ? "#e0c8ff" : "#fff5ec",
-                accent: "#ce4257", eyeColor: "#1a1a1d",
+                primary: state.mods.invinciball ? "#dffcff" : "#f5fbff",
+                accent: state.mods.invinciball ? "#0f2747" : "#1d4ed8",
+                eyeColor: state.mods.invinciball ? "#00c2ff" : "#13264d",
                 ears: "normal"
             });
         }

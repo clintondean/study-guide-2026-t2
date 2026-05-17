@@ -11,7 +11,7 @@
     const FRUIT_SLOTS = 2;
     const BONUS_FRUIT_MS = 15000;
     const EFFECT_MS = 15000;
-    const CRAZY_BURST_MS = 3000;
+    const CRAZY_BURST_MS = 6000;
     const CRAZY_BURST_COUNT = 20;
     const BASE_STEP_MS = 175;
     const MIN_STEP_MS = 88;
@@ -81,7 +81,7 @@
         crazy: {
             short: "Crazy",
             label: "Crazy fruit",
-            description: "Burst into 20 fruit for 3s",
+            description: "Burst into 20 fruit for 6s",
             points: 22,
             crazy: true,
             bonus: true,

@@ -494,6 +494,121 @@
         return event.subjectName;
     }
 
+    function formatExamDayDate(dateKey) {
+        if (!dateKey) return "";
+        const date = new Date(dateKey + "T12:00:00");
+        if (Number.isNaN(date.getTime())) return dateKey;
+        return date.toLocaleDateString(undefined, {
+            weekday: "short",
+            day: "numeric",
+            month: "short"
+        });
+    }
+
+    function updateExamScheduleEntries(yearId, entriesBySubject) {
+        const year = normalizeYearId(yearId);
+        if (!year) return;
+        const defaults = defaultExamScheduleForYear(year);
+        const nextSchedule = normalizeExamSchedule(state.settings && state.settings.examSchedule);
+        const currentOverrides = Object.assign({}, nextSchedule[year] || {});
+        normalizeSelectedSubjects(year, Object.keys(entriesBySubject || {})).forEach(subjectId => {
+            const nextEntry = sanitizeExamDayEntry(entriesBySubject[subjectId]);
+            const defaultEntry = sanitizeExamDayEntry(defaults[subjectId]);
+            if (!nextEntry.date && !defaultEntry.date && !nextEntry.detail && !defaultEntry.detail) {
+                delete currentOverrides[subjectId];
+                return;
+            }
+            if (!nextEntry.date && (defaultEntry.date || defaultEntry.detail)) {
+                currentOverrides[subjectId] = nextEntry;
+                return;
+            }
+            if (nextEntry.date === defaultEntry.date && nextEntry.detail === defaultEntry.detail) {
+                delete currentOverrides[subjectId];
+                return;
+            }
+            if (nextEntry.date || nextEntry.detail) currentOverrides[subjectId] = nextEntry;
+            else delete currentOverrides[subjectId];
+        });
+        if (Object.keys(currentOverrides).length) nextSchedule[year] = currentOverrides;
+        else delete nextSchedule[year];
+        state.settings.examSchedule = nextSchedule;
+        saveState();
+    }
+
+    function clearExamScheduleOverrides(yearId, subjectIds) {
+        const year = normalizeYearId(yearId);
+        if (!year) return;
+        const nextSchedule = normalizeExamSchedule(state.settings && state.settings.examSchedule);
+        const currentOverrides = Object.assign({}, nextSchedule[year] || {});
+        normalizeSelectedSubjects(year, subjectIds).forEach(subjectId => {
+            delete currentOverrides[subjectId];
+        });
+        if (Object.keys(currentOverrides).length) nextSchedule[year] = currentOverrides;
+        else delete nextSchedule[year];
+        state.settings.examSchedule = nextSchedule;
+        saveState();
+    }
+
+    function renderProgressExamPlanner(yearId, subjectIds) {
+        const year = normalizeYearId(yearId);
+        if (!year) return "";
+        const subjects = normalizeSelectedSubjects(year, subjectIds);
+        const schedule = examScheduleForYear(year);
+        const upcoming = examDayEventsForSubjects(year, subjects).sort((a, b) => a.date.getTime() - b.date.getTime());
+        return `
+            <section class="progress-calendar-card progress-calendar-editor-card">
+                <div class="progress-calendar-exam-tools">
+                    <div class="progress-calendar-upcoming">
+                        <h2>Exam day planner</h2>
+                        <p>Update the exam days shown on this calendar. This only changes your saved exam schedule, not quiz progress.</p>
+                        ${upcoming.length ? `
+                            <ul class="progress-calendar-exam-list">
+                                ${upcoming.map(event => `
+                                    <li class="progress-calendar-exam-item">
+                                        <strong>${escapeHtml(event.subjectName)}</strong>
+                                        <span>${escapeHtml(formatExamDayDate(event.dateKey))}${event.detail ? ` · ${escapeHtml(event.detail)}` : ""}</span>
+                                    </li>
+                                `).join("")}
+                            </ul>
+                        ` : `
+                            <p class="muted">No exam days saved for these subjects yet.</p>
+                        `}
+                    </div>
+                    <details class="progress-calendar-editor">
+                        <summary>Edit exam days</summary>
+                        <p class="settings-help">Blank dates stay hidden from the calendar, and handbook defaults can be restored at any time.</p>
+                        <div class="exam-day-grid">
+                            ${subjects.map(subjectId => {
+                                const subj = window.SUBJECT_DATA[subjectId];
+                                const entry = sanitizeExamDayEntry(schedule[subjectId]);
+                                return `
+                                    <div class="exam-day-row">
+                                        <div class="exam-day-subject">
+                                            <strong>${subj ? escapeHtml(subj.name) : escapeHtml(subjectId)}</strong>
+                                            <span>${entry.detail ? escapeHtml(entry.detail) : "No exam day set yet."}</span>
+                                        </div>
+                                        <label class="settings-field exam-day-field">
+                                            <span>Date</span>
+                                            <input type="date" data-progress-exam-date="${subjectId}" value="${escapeHtml(entry.date)}">
+                                        </label>
+                                        <label class="settings-field exam-day-field exam-day-detail-field">
+                                            <span>Time / notes</span>
+                                            <input type="text" data-progress-exam-detail="${subjectId}" value="${escapeHtml(entry.detail)}" placeholder="e.g. P3 & 4 · 90 mins">
+                                        </label>
+                                    </div>
+                                `;
+                            }).join("")}
+                        </div>
+                        <div class="settings-actions">
+                            <button type="button" class="primary-btn" id="progress-save-exams">Save exam days</button>
+                            <button type="button" class="ghost-btn" id="progress-reset-exams">Reset selected subjects</button>
+                        </div>
+                    </details>
+                </div>
+            </section>
+        `;
+    }
+
     function savedCustomName() {
         return ((state.settings && state.settings.customName) || "").trim().slice(0, 24);
     }
@@ -3082,6 +3197,7 @@
             <h1>My progress</h1>
             <p>${summary.attempted} questions answered · ${pct(summary.correct, summary.attempted)}% correct overall · best streak ${state.stats.bestStreak} 🔥</p>
             ${renderProgressCalendar(calendar, progressCalendarMonthKey)}
+            ${renderProgressExamPlanner(currentSelectedYear(), liveIds)}
             <div class="progress-grid">${rows}</div>
         `;
 
@@ -3103,6 +3219,31 @@
                     progressCalendarMonthKey = calendar.monthKeys[idx + 1];
                     renderProgress(root);
                 }
+            });
+        }
+        const saveExamsBtn = document.getElementById("progress-save-exams");
+        if (saveExamsBtn) {
+            saveExamsBtn.addEventListener("click", () => {
+                const entriesBySubject = {};
+                liveIds.forEach(subjectId => {
+                    const dateInput = root.querySelector(`[data-progress-exam-date="${subjectId}"]`);
+                    const detailInput = root.querySelector(`[data-progress-exam-detail="${subjectId}"]`);
+                    entriesBySubject[subjectId] = {
+                        date: dateInput ? dateInput.value : "",
+                        detail: detailInput ? detailInput.value : ""
+                    };
+                });
+                updateExamScheduleEntries(currentSelectedYear(), entriesBySubject);
+                renderProgress(root);
+                mascotPopIn({ expression: "proud", message: "Exam days updated!", duration: 2200 });
+            });
+        }
+        const resetExamsBtn = document.getElementById("progress-reset-exams");
+        if (resetExamsBtn) {
+            resetExamsBtn.addEventListener("click", () => {
+                clearExamScheduleOverrides(currentSelectedYear(), liveIds);
+                renderProgress(root);
+                mascotPopIn({ expression: "wave", message: "Calendar exam days reset.", duration: 2200 });
             });
         }
     }
@@ -4858,29 +4999,16 @@
         const saveExamsBtn = $("#settings-save-exams");
         if (saveExamsBtn && examYearId) {
             saveExamsBtn.addEventListener("click", () => {
-                const defaults = defaultExamScheduleForYear(examYearId);
-                const nextSchedule = normalizeExamSchedule(state.settings.examSchedule);
-                const yearOverrides = {};
+                const entriesBySubject = {};
                 examSubjects.forEach(subject => {
                     const dateInput = root.querySelector(`[data-exam-date="${subject.id}"]`);
                     const detailInput = root.querySelector(`[data-exam-detail="${subject.id}"]`);
-                    const nextEntry = sanitizeExamDayEntry({
+                    entriesBySubject[subject.id] = {
                         date: dateInput ? dateInput.value : "",
                         detail: detailInput ? detailInput.value : ""
-                    });
-                    const defaultEntry = sanitizeExamDayEntry(defaults[subject.id]);
-                    if (!nextEntry.date && !defaultEntry.date && !nextEntry.detail && !defaultEntry.detail) return;
-                    if (!nextEntry.date && (defaultEntry.date || defaultEntry.detail)) {
-                        yearOverrides[subject.id] = nextEntry;
-                        return;
-                    }
-                    if (nextEntry.date === defaultEntry.date && nextEntry.detail === defaultEntry.detail) return;
-                    if (nextEntry.date || nextEntry.detail) yearOverrides[subject.id] = nextEntry;
+                    };
                 });
-                if (Object.keys(yearOverrides).length) nextSchedule[examYearId] = yearOverrides;
-                else delete nextSchedule[examYearId];
-                state.settings.examSchedule = nextSchedule;
-                saveState();
+                updateExamScheduleEntries(examYearId, entriesBySubject);
                 renderSettings(root, profileDraft);
                 mascotPopIn({ expression: "proud", message: "Exam days updated!", duration: 2200 });
             });
@@ -4888,10 +5016,7 @@
         const resetExamsBtn = $("#settings-reset-exams");
         if (resetExamsBtn && examYearId) {
             resetExamsBtn.addEventListener("click", () => {
-                const nextSchedule = normalizeExamSchedule(state.settings.examSchedule);
-                delete nextSchedule[examYearId];
-                state.settings.examSchedule = nextSchedule;
-                saveState();
+                clearExamScheduleOverrides(examYearId, examSubjects.map(subject => subject.id));
                 renderSettings(root, profileDraft);
                 mascotPopIn({ expression: "wave", message: "Handbook defaults restored.", duration: 2200 });
             });

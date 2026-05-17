@@ -125,7 +125,7 @@
                     <button type="button" data-act="right">→</button>
                 </div>
             </div>
-            <p class="break-help">Don't drop the ball! Each new level launches at double the previous level's speed, brick points double with it, and stacked pills extend matching timers.</p>
+            <p class="break-help">Don't drop the ball! Each new level launches at 1.5x the previous level's speed, brick points still double with each level, and stacked pills extend matching timers.</p>
         `;
         canvas = document.getElementById("catanoid-canvas");
         ctx = canvas.getContext("2d");
@@ -209,7 +209,8 @@
     }
 
     function levelStartSpeed(level) {
-        return BASE_BALL_SPEED * levelMultiplier(level);
+        const safeLevel = Math.max(1, level || (state && state.level) || 1);
+        return BASE_BALL_SPEED * Math.pow(1.5, safeLevel - 1);
     }
 
     function brickPoints(row, level) {

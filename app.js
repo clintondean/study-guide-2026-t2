@@ -3738,7 +3738,7 @@
         },
         {
             id: "meowterbike",
-            name: "Meowterbike",
+            name: "MeowtorBike",
             icon: "🏍️",
             blurb: "Rip through cat-cross tracks, dodge rivals, and manage turbo heat.",
             color: "#f4a261",
@@ -4805,7 +4805,7 @@
                     <li><span>🦊</span> Your <strong>${animalCount}</strong> animal companion${animalCount === 1 ? "" : "s"} and all their happiness</li>
                     <li><span>🎟️</span> ${animalTickets} unspent Pet Ticket${animalTickets === 1 ? "" : "s"}</li>
                     <li><span>✨</span> ${sparklePotions} Sparkle Potion${sparklePotions === 1 ? "" : "s"}</li>
-                    <li><span>🐱</span> <strong>${savedBreakBestCount}</strong> saved break-game best${savedBreakBestCount === 1 ? "" : "s"}, including Meowterbike tour times</li>
+                    <li><span>🐱</span> <strong>${savedBreakBestCount}</strong> saved break-game best${savedBreakBestCount === 1 ? "" : "s"}, including MeowtorBike tour times</li>
                     <li><span>🔥</span> Your current and best streaks</li>
                     <li><span>⏱️</span> Break cooldown timer</li>
                 </ul>

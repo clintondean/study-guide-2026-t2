@@ -34,6 +34,7 @@
     const POWER_PELLET_MS = 7000;
     const BONUS_FRUIT_MS = 9000;
     const BONUS_FRUIT_THRESHOLDS = [0.72, 0.34];
+    const GHOST_WAKE_DELAYS_MS = [1200, 2600, 4200, 5800];
 
     const DIRS = {
         left: { row: 0, col: -1, angle: Math.PI },
@@ -178,7 +179,7 @@
             _highSaved: false
         };
         loadLevel();
-        hideOverlay();
+        primeRound("Ready to pounce?", "Press an arrow key or tap a button to launch Cat-man.");
         updateHud();
         updateStatus(now);
         renderTimer();
@@ -207,6 +208,27 @@
         resetEntities();
     }
 
+    function primeRound(title, message) {
+        state.awaitingLaunch = true;
+        state.playerAccumulator = 0;
+        state.ghostAccumulator = 0;
+        state.lastFrameAt = performance.now();
+        showInfoOverlay(title, message);
+    }
+
+    function launchRound() {
+        if (!state || !state.awaitingLaunch) return;
+        const now = performance.now();
+        state.awaitingLaunch = false;
+        state.playerAccumulator = 0;
+        state.ghostAccumulator = 0;
+        state.lastFrameAt = now;
+        state.ghosts.forEach(function (ghost) {
+            ghost.wakeAt = now + ghost.wakeDelayMs;
+        });
+        hideOverlay();
+    }
+
     function resetEntities() {
         state.player = {
             row: BASE_LAYOUT.playerStart.row,
@@ -215,7 +237,7 @@
             pendingDir: "left",
             mouthPhase: 0
         };
-        state.ghosts = GHOST_META.map(function (meta) {
+        state.ghosts = GHOST_META.map(function (meta, i) {
             const start = BASE_LAYOUT.ghostStarts[meta.startChar];
             return {
                 id: meta.id,
@@ -233,7 +255,9 @@
                 scatter: meta.scatter,
                 ai: meta.ai,
                 eaten: false,
-                releaseAt: 0
+                respawnAt: 0,
+                wakeAt: 0,
+                wakeDelayMs: GHOST_WAKE_DELAYS_MS[Math.min(i, GHOST_WAKE_DELAYS_MS.length - 1)]
             };
         });
     }
@@ -347,6 +371,7 @@
     function queueDirection(dir) {
         if (!state || state.gameOver) return;
         state.player.pendingDir = dir;
+        if (state.awaitingLaunch) launchRound();
     }
 
     function loop(now) {
@@ -357,17 +382,19 @@
         if (!state.paused && !state.gameOver) {
             if (state.fruit && now >= state.fruit.expiresAt) state.fruit = null;
 
-            state.playerAccumulator += dt;
-            while (state.playerAccumulator >= playerStepMs()) {
-                state.playerAccumulator -= playerStepMs();
-                stepPlayer(now);
-                if (state.gameOver) break;
-            }
+            if (!state.awaitingLaunch) {
+                state.playerAccumulator += dt;
+                while (state.playerAccumulator >= playerStepMs()) {
+                    state.playerAccumulator -= playerStepMs();
+                    stepPlayer(now);
+                    if (state.gameOver) break;
+                }
 
-            state.ghostAccumulator += dt;
-            while (!state.gameOver && state.ghostAccumulator >= ghostStepMs(now)) {
-                state.ghostAccumulator -= ghostStepMs(now);
-                stepGhosts(now);
+                state.ghostAccumulator += dt;
+                while (!state.gameOver && state.ghostAccumulator >= ghostStepMs(now)) {
+                    state.ghostAccumulator -= ghostStepMs(now);
+                    stepGhosts(now);
+                }
             }
 
             updatePopups(dt);
@@ -406,11 +433,13 @@
     function stepGhosts(now) {
         for (let i = 0; i < state.ghosts.length; i++) {
             const ghost = state.ghosts[i];
-            if (ghost.eaten && ghost.releaseAt && now < ghost.releaseAt) continue;
-            if (ghost.eaten && ghost.releaseAt && now >= ghost.releaseAt) {
+            if (ghost.respawnAt && now < ghost.respawnAt) continue;
+            if (ghost.respawnAt && now >= ghost.respawnAt) {
                 ghost.eaten = false;
-                ghost.releaseAt = 0;
+                ghost.respawnAt = 0;
             }
+            if (ghost.wakeAt && now < ghost.wakeAt) continue;
+            if (ghost.wakeAt && now >= ghost.wakeAt) ghost.wakeAt = 0;
             const nextDir = chooseGhostDirection(ghost, now);
             if (nextDir) ghost.dir = nextDir;
             if (canMove(ghost.row, ghost.col, ghost.dir)) {
@@ -516,8 +545,8 @@
         maybeSpawnFruit(now);
         if (state.pellets.size === 0 && state.powerPellets.size === 0) {
             state.level++;
-            addPopup(BASE_LAYOUT.fruitSpawn.row, BASE_LAYOUT.fruitSpawn.col, "Level " + state.level + "!", "#9be7a1");
             loadLevel();
+            primeRound("Level " + state.level, "Press a direction to prowl through the next maze.");
             updateHud();
         }
     }
@@ -560,7 +589,8 @@
                 ghost.col = ghost.startCol;
                 ghost.dir = ghost.startDir;
                 ghost.eaten = true;
-                ghost.releaseAt = now + EATEN_RELEASE_MS;
+                ghost.respawnAt = now + EATEN_RELEASE_MS;
+                ghost.wakeAt = 0;
             } else {
                 loseLife();
                 return;
@@ -581,6 +611,7 @@
         state.playerAccumulator = 0;
         state.ghostAccumulator = 0;
         resetEntities();
+        primeRound("Still in the hunt", "Press an arrow key or tap a button to use your next life.");
     }
 
     function updatePopups(dt) {
@@ -659,6 +690,13 @@
         }
     }
 
+    function showInfoOverlay(title, message) {
+        const overlay = document.getElementById("catman-overlay");
+        if (!overlay) return;
+        overlay.hidden = false;
+        overlay.innerHTML = `<div class="overlay-card"><h2>${title}</h2><p>${message}</p></div>`;
+    }
+
     function updateHud() {
         const high = document.getElementById("catman-high");
         const score = document.getElementById("catman-score");
@@ -675,6 +713,9 @@
         if (!host || !state) return;
         const chips = [];
         chips.push(chipHtml("cat-man-chip is-neutral", remainingTreats() + " treats left"));
+        if (state.awaitingLaunch) {
+            chips.push(chipHtml("cat-man-chip is-level", "Pick a direction to start"));
+        }
         if (isFrightened(now)) {
             chips.push(chipHtml("cat-man-chip is-fright", "Fur-rightened " + formatSecondsLeft(state.frightenedUntil, now)));
         }

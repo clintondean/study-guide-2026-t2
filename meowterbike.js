@@ -1,4 +1,4 @@
-// Meowterbike — Excitebike-inspired cat motocross racer.
+// MeowtorBike — Excitebike-inspired cat motocross racer.
 // Shared 5-minute break-session timer (window.BreakSession).
 // Exposes window.Meowterbike with start(rootEl, opts) and stop().
 
@@ -24,6 +24,7 @@
     const CPU_TURBO_ACCEL = 36;
     const CPU_DRAG = 14;
     const CPU_MAX_SPEED = 58;
+    const CPU_TURBO_SPEED = 66;
     const MAX_HEAT = 100;
     const HEAT_GAIN_PER_SEC = 34;
     const HEAT_COOL_PER_SEC = 16;
@@ -182,7 +183,7 @@
             <a class="back-link" href="#/break">← Switch game</a>
             <header class="break-game-header">
                 <div>
-                    <h1>🏍️ Meowterbike</h1>
+                    <h1>🏍️ MeowtorBike</h1>
                     <p class="break-game-blurb">Race cat-cross tracks, nail your landings, and keep your turbo cool enough to chase the podium.</p>
                 </div>
                 <div class="tetris-timer-wrap">
@@ -200,7 +201,7 @@
             </div>
             <div class="meowterbike-layout">
                 <div class="break-canvas-wrap">
-                    <canvas id="meowterbike-canvas" width="${W}" height="${H}" tabindex="0" aria-label="Meowterbike race track"></canvas>
+                    <canvas id="meowterbike-canvas" width="${W}" height="${H}" tabindex="0" aria-label="MeowtorBike race track"></canvas>
                     <div class="break-overlay" id="meowterbike-overlay" hidden></div>
                 </div>
                 <aside class="meowterbike-panel">

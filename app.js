@@ -235,7 +235,8 @@
                 catrisHighScore: 0,
                 invadersHighScore: 0,
                 catanoidHighScore: 0,
-                dangerNoodleHighScore: 0
+                dangerNoodleHighScore: 0,
+                catManHighScore: 0
             }
         };
     }
@@ -1071,6 +1072,7 @@
         if (window.CatInvaders && window.CatInvaders.stop) window.CatInvaders.stop();
         if (window.Catanoid && window.Catanoid.stop) window.Catanoid.stop();
         if (window.DangerNoodle && window.DangerNoodle.stop) window.DangerNoodle.stop();
+        if (window.CatMan && window.CatMan.stop) window.CatMan.stop();
         // If leaving the break section entirely, end the shared session.
         if (!goingToBreak && window.BreakSession) window.BreakSession.end();
         if (!goingToBreak && window._breakLockoutTimer) {
@@ -1095,6 +1097,7 @@
             if (route[1] === "invaders") return renderBreakGame(root, "invaders");
             if (route[1] === "catanoid") return renderBreakGame(root, "catanoid");
             if (route[1] === "danger-noodle") return renderBreakGame(root, "danger-noodle");
+            if (route[1] === "cat-man") return renderBreakGame(root, "cat-man");
             return renderBreakHub(root);
         }
         if (route[0] === "clan") {
@@ -3721,6 +3724,14 @@
             blurb: "Classic Snake with two fruit slots and wild bonus fruit.",
             color: "#70c44f",
             highKey: "dangerNoodleHighScore"
+        },
+        {
+            id: "cat-man",
+            name: "Cat-man",
+            icon: "🐾",
+            blurb: "Chomp treats, dodge rival cats, and pounce on bonus snacks.",
+            color: "#2f8fce",
+            highKey: "catManHighScore"
         }
     ];
 
@@ -3839,6 +3850,7 @@
         if (gameId === "invaders") return window.CatInvaders.start(root, opts);
         if (gameId === "catanoid") return window.Catanoid.start(root, opts);
         if (gameId === "danger-noodle") return window.DangerNoodle.start(root, opts);
+        if (gameId === "cat-man") return window.CatMan.start(root, opts);
     }
 
     function renderBreakStartPrompt(root, gameId) {
@@ -4727,10 +4739,8 @@
         const tickets = cs.claimTickets || 0;
         const animalTickets = animalProgress.claimTickets || 0;
         const sparklePotions = sparklePotionCount();
-        const catrisHigh = (state.breaks && state.breaks.catrisHighScore) || 0;
-        const invadersHigh = (state.breaks && state.breaks.invadersHighScore) || 0;
-        const catanoidHigh = (state.breaks && state.breaks.catanoidHighScore) || 0;
-        const highScore = Math.max(catrisHigh, invadersHigh, catanoidHigh);
+        const breakHighs = BREAK_GAMES.map(game => (state.breaks && state.breaks[game.highKey]) || 0);
+        const highScore = breakHighs.length ? Math.max.apply(null, breakHighs) : 0;
         const sessions = STATE_SUBJECTS.reduce((n, id) => n + (state.subjects[id].quizSessions || []).length, 0);
         const namedCats = catCompanionEntries().filter(c => {
             const breed = catSpecFor(catEntryId(c));
@@ -4757,7 +4767,7 @@
                     <li><span>🦊</span> Your <strong>${animalCount}</strong> animal companion${animalCount === 1 ? "" : "s"} and all their happiness</li>
                     <li><span>🎟️</span> ${animalTickets} unspent Pet Ticket${animalTickets === 1 ? "" : "s"}</li>
                     <li><span>✨</span> ${sparklePotions} Sparkle Potion${sparklePotions === 1 ? "" : "s"}</li>
-                    <li><span>🐱</span> All Catris/Invaders/Catanoid high scores (best: <strong>${highScore}</strong>)</li>
+                    <li><span>🐱</span> All break-game high scores, including Cat-man (best: <strong>${highScore}</strong>)</li>
                     <li><span>🔥</span> Your current and best streaks</li>
                     <li><span>⏱️</span> Break cooldown timer</li>
                 </ul>

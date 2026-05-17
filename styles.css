@@ -3308,7 +3308,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 
 .danger-noodle-layout,
-.catanoid-layout {
+.catanoid-layout,
+.cat-man-layout {
     display: grid;
     grid-template-columns: minmax(0, auto) minmax(260px, 300px);
     gap: 1rem;
@@ -3316,7 +3317,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 
 .danger-noodle-panel,
-.catanoid-panel {
+.catanoid-panel,
+.cat-man-panel {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -3328,24 +3330,28 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 
 .danger-noodle-panel h3,
-.catanoid-panel h3 {
+.catanoid-panel h3,
+.cat-man-panel h3 {
     font-size: 1.05rem;
 }
 
 .danger-noodle-panel-copy,
-.catanoid-panel-copy {
+.catanoid-panel-copy,
+.cat-man-panel-copy {
     color: var(--text-muted);
     font-size: 0.88rem;
     line-height: 1.45;
 }
 
-.danger-noodle-status {
+.danger-noodle-status,
+.cat-man-status {
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem;
 }
 
-.danger-noodle-chip {
+.danger-noodle-chip,
+.cat-man-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
@@ -3359,8 +3365,27 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 }
 
 .danger-noodle-chip.is-neutral,
-.danger-noodle-chip.is-quiet {
+.danger-noodle-chip.is-quiet,
+.cat-man-chip.is-neutral {
     color: var(--text-muted);
+}
+
+.cat-man-chip.is-level {
+    background: rgba(255, 209, 102, 0.18);
+    border-color: rgba(255, 209, 102, 0.4);
+    color: #b27700;
+}
+
+.cat-man-chip.is-fright {
+    background: rgba(76, 110, 245, 0.18);
+    border-color: rgba(76, 110, 245, 0.42);
+    color: #3653ce;
+}
+
+.cat-man-chip.is-fruit {
+    background: rgba(255, 127, 81, 0.18);
+    border-color: rgba(255, 127, 81, 0.42);
+    color: #c65327;
 }
 
 .danger-noodle-chip.is-super {
@@ -3398,7 +3423,8 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     gap: 0.55rem;
 }
 
-.catanoid-legend {
+.catanoid-legend,
+.cat-man-legend {
     display: grid;
     gap: 0.55rem;
 }
@@ -3424,6 +3450,16 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     border: 1px solid var(--border);
 }
 
+.cat-man-legend-item {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 0.65rem;
+    align-items: start;
+    background: var(--surface-soft);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.7rem;
+}
+
 .catanoid-legend-item.is-good {
     border-color: color-mix(in srgb, var(--good) 18%, var(--border) 82%);
 }
@@ -3442,12 +3478,22 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     font-size: 0.9rem;
 }
 
+.cat-man-legend-item strong {
+    display: block;
+    font-size: 0.9rem;
+}
+
 .danger-noodle-legend-item span {
     color: var(--text-muted);
     font-size: 0.78rem;
 }
 
 .catanoid-legend-item span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.cat-man-legend-item span {
     color: var(--text-muted);
     font-size: 0.78rem;
 }
@@ -3476,6 +3522,28 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     line-height: 1;
     letter-spacing: 0.03em;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 0 0 1px rgba(0,0,0,0.08);
+}
+
+.cat-man-swatch {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin-top: 0.25rem;
+    background: #ffd166;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+.cat-man-legend-item.is-power .cat-man-swatch {
+    background: #4c6ef5;
+}
+
+.cat-man-legend-item.is-fruit .cat-man-swatch {
+    background: #ff7f51;
+}
+
+.cat-man-legend-item.is-fright .cat-man-swatch {
+    background: #56cfe1;
 }
 
 .danger-noodle-normal .danger-noodle-swatch { background: #ff6b6b; }
@@ -3515,12 +3583,14 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 
 @media (max-width: 980px) {
     .danger-noodle-layout,
-    .catanoid-layout {
+    .catanoid-layout,
+    .cat-man-layout {
         grid-template-columns: 1fr;
     }
 
     .danger-noodle-panel,
-    .catanoid-panel {
+    .catanoid-panel,
+    .cat-man-panel {
         order: 2;
     }
 }

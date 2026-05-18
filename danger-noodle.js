@@ -16,7 +16,7 @@
     const BASE_STEP_MS = 175;
     const MIN_STEP_MS = 88;
     const MAX_TURN_QUEUE = 2;
-    const BONUS_TYPES = ["super", "turbo", "poison", "sloMo", "crazy"];
+    const BONUS_TYPES = ["super", "turbo", "question", "sloMo", "crazy"];
     const DIRS = {
         up: { x: 0, y: -1, name: "up" },
         right: { x: 1, y: 0, name: "right" },
@@ -56,16 +56,15 @@
             leaf: "#4caf50",
             accent: "#ffe0bf"
         },
-        poison: {
-            short: "Poison",
-            label: "Poison fruit",
-            description: "-2 segments",
-            points: 8,
-            shrink: 2,
+        question: {
+            short: "Question",
+            label: "Question fruit",
+            description: "Mystery: either -2 or +3 segments",
+            points: 16,
             bonus: true,
-            body: "#9b5de5",
+            body: "#8d6bff",
             leaf: "#5fcfbf",
-            accent: "#e1d0ff"
+            accent: "#ffe4a3"
         },
         sloMo: {
             short: "Slo-mo",
@@ -228,7 +227,7 @@
                         ${legendItem("normal")}
                         ${legendItem("super")}
                         ${legendItem("turbo")}
-                        ${legendItem("poison")}
+                        ${legendItem("question")}
                         ${legendItem("sloMo")}
                         ${legendItem("crazy")}
                     </div>
@@ -374,7 +373,7 @@
         const next = { x: head.x + state.dir.x, y: head.y + state.dir.y };
         const fruit = findFruit(state.fruits, next.x, next.y);
         const burstFruit = fruit ? null : findFruit(state.burstFruits, next.x, next.y);
-        const incomingGrowth = fruit ? (FRUIT_META[fruit.type].grow || 0) : (burstFruit ? 1 : 0);
+        const incomingGrowth = fruit ? previewFruitGrowth(fruit) : (burstFruit ? 1 : 0);
         const tailStays = state.pendingGrowth + incomingGrowth > 0;
 
         if (outOfBounds(next) || hitsSnake(next, tailStays)) {
@@ -424,7 +423,7 @@
         const index = state.fruits.indexOf(fruit);
         if (index !== -1) state.fruits.splice(index, 1);
 
-        const meta = FRUIT_META[fruit.type];
+        const meta = resolveFruitEffect(fruit);
         state.score += meta.points || 0;
         state.pendingGrowth += meta.grow || 0;
         state.pendingShrink += meta.shrink || 0;
@@ -441,6 +440,31 @@
         if (meta.crazy) {
             spawnCrazyBurst(now);
         }
+    }
+
+    function previewFruitGrowth(fruit) {
+        if (!fruit || fruit.type === "question") return 0;
+        return FRUIT_META[fruit.type].grow || 0;
+    }
+
+    function resolveFruitEffect(fruit) {
+        const meta = FRUIT_META[fruit.type];
+        if (!meta) return FRUIT_META.normal;
+        if (fruit.type !== "question") return meta;
+        if (Math.random() < 0.5) {
+            return Object.assign({}, meta, {
+                short: "Poison",
+                points: 8,
+                shrink: 2,
+                grow: 0
+            });
+        }
+        return Object.assign({}, meta, {
+            short: "Mega",
+            points: 30,
+            grow: 3,
+            shrink: 0
+        });
     }
 
     function eatBurstFruit(fruit) {
@@ -803,8 +827,8 @@
             drawSparkle(cx, cy, radius * 1.2, "#fff6b0");
         } else if (fruit.type === "turbo") {
             drawBolt(cx, cy, radius * 1.1, "#fff8eb");
-        } else if (fruit.type === "poison") {
-            drawCross(cx, cy, radius * 0.95, "#fff8ff");
+        } else if (fruit.type === "question") {
+            drawQuestionMark(cx, cy, radius * 1.1, "#fffaf0");
         } else if (fruit.type === "sloMo") {
             drawClock(cx, cy, radius * 0.95, "#f2ffff");
         } else if (fruit.type === "crazy") {
@@ -859,6 +883,14 @@
         ctx.moveTo(cx + size * 0.5, cy - size * 0.5);
         ctx.lineTo(cx - size * 0.5, cy + size * 0.5);
         ctx.stroke();
+    }
+
+    function drawQuestionMark(cx, cy, size, color) {
+        ctx.fillStyle = color;
+        ctx.font = `bold ${Math.max(12, Math.round(size))}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("?", cx, cy + size * 0.05);
     }
 
     function drawClock(cx, cy, size, color) {

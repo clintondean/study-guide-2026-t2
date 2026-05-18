@@ -3452,10 +3452,10 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     color: #d66a19;
 }
 
-.danger-noodle-chip.is-poison {
-    background: rgba(155, 93, 229, 0.18);
-    border-color: rgba(155, 93, 229, 0.45);
-    color: #7040b8;
+.danger-noodle-chip.is-question {
+    background: rgba(141, 107, 255, 0.18);
+    border-color: rgba(141, 107, 255, 0.45);
+    color: #6541c7;
 }
 
 .danger-noodle-chip.is-sloMo {
@@ -3715,7 +3715,7 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
 .danger-noodle-normal .danger-noodle-swatch { background: #ff6b6b; }
 .danger-noodle-super .danger-noodle-swatch { background: #ffd166; }
 .danger-noodle-turbo .danger-noodle-swatch { background: #ff8c42; }
-.danger-noodle-poison .danger-noodle-swatch { background: #9b5de5; }
+.danger-noodle-question .danger-noodle-swatch { background: #8d6bff; }
 .danger-noodle-sloMo .danger-noodle-swatch { background: #4ecdc4; }
 .danger-noodle-crazy .danger-noodle-swatch { background: #3da9fc; }
 

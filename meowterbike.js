@@ -589,7 +589,7 @@
 
             if (obstacle.type === "mud" && inZone && !bike.airborne) {
                 bike.speed = Math.max(8, bike.speed - obstacle.drag * dt / 1000);
-            } else if (obstacle.type === "tight" && inZone && !bike.airborne && bike.invincibleUntil <= now) {
+            } else if (obstacle.type === "tight" && inZone && !bike.airborne && bike.invincibleUntil <= now && bike.speed > 0) {
                 if (!isPlayer) bike.targetLane = bestOpenLaneForObstacle(obstacle, bike.lanePos);
                 crashBike(bike, now, isPlayer, "Barriers!");
                 bike.obstacleHits[obstacle.id] = true;
@@ -636,7 +636,7 @@
         bike.wheelieAmount = 0;
     }
 
-    function crashBike(bike, now, isPlayer, text, grantPileupInvincibility) {
+    function crashBike(bike, now, isPlayer, text) {
         bike.crashedUntil = now + CRASH_MS;
         bike.stalledUntil = 0;
         bike.airborne = false;
@@ -649,7 +649,7 @@
         bike.launchBoost = 1;
         bike.launchSpeed = 0;
         bike.targetLane = 0;
-        if (grantPileupInvincibility) bike.invincibleUntil = now + CRASH_MS + PILEUP_INVINCIBLE_MS;
+        bike.invincibleUntil = now + CRASH_MS + PILEUP_INVINCIBLE_MS;
         if (isPlayer) addPopup(bike.distance, bike.lanePos, text || "Crash!", "#ff7f51");
     }
 
@@ -822,8 +822,8 @@
             if (state.player.invincibleUntil > now || rival.invincibleUntil > now) return;
             if (Math.abs(state.player.lanePos - rival.lanePos) > 0.35) return;
             if (Math.abs(state.player.distance - rival.distance) > COLLISION_DISTANCE) return;
-            crashBike(state.player, now, true, "Pile-up!", true);
-            crashBike(rival, now, false, "Pile-up!", true);
+            crashBike(state.player, now, true, "Pile-up!");
+            crashBike(rival, now, false, "Pile-up!");
         });
     }
 

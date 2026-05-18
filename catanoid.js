@@ -32,16 +32,16 @@
     const POWERUP_W = 36, POWERUP_H = 18;
 
     const POWERUPS = {
-        extraBall:   { label: "+1",  emoji: "🐱",  color: "#5fcfbf", text: "Extra ball!",    name: "Extra ball",    description: "Spawn extra balls instantly",          ms: 0,     good: true },
-        growBall:    { label: "B",   emoji: "💪",  color: "#9b5de5", text: "Big ball!",      name: "Big ball",      description: "Larger ball for 12s",                 ms: 12000, good: true },
-        growPad:     { label: "GROW",emoji: "↔️",  color: "#43aa8b", text: "Big paddle!",    name: "Big paddle",    description: "Wider paddle for 15s",               ms: 15000, good: true },
-        shrinkPad:   { label: "SHRK",emoji: "🤏",  color: "#e76f51", text: "Tiny paddle!",   name: "Tiny paddle",   description: "Smaller paddle for 10s",             ms: 10000, good: false },
-        slowBall:    { label: "SLOW",emoji: "🐌",  color: "#ffd166", text: "Slow-mo!",       name: "Slow-mo",       description: "0.6x ball speed for 10s",            ms: 10000, good: true },
-        extraLife:   { label: "♥",   emoji: "❤️",  color: "#ff5b8b", text: "Extra life!",    name: "Extra life",    description: "+1 life instantly",                    ms: 0,     good: true },
-        sticky:      { label: "STKY",emoji: "🪝",  color: "#7d5a3c", text: "Sticky paddle!", name: "Sticky paddle", description: "Catch and relaunch balls for 9s",      ms: 9000,  good: true },
-        pistol:      { label: "PEW", emoji: "🔫",  color: "#3da9fc", text: "Paddle pistol!", name: "Paddle pistol", description: "Dual blasters for 10s",                ms: 10000, good: true },
-        invinciball: { label: "INV", emoji: "✨",  color: "#56cfe1", text: "Invinciball!",   name: "Invinciball",   description: "Smash through bricks for 10s",        ms: 10000, good: true },
-        fastBall:    { label: "FAST",emoji: "⚡",  color: "#ff7f51", text: "Speed up!",      name: "Speed up",      description: "1.5x ball speed for 7s",             ms: 7000,  good: false }
+        extraBall:   { label: "+1",  emoji: "🐱",  color: "#5fcfbf", text: "Extra ball!",    name: "Extra ball",    description: "One-time multiball burst",            kind: "instant",  ms: 0,     good: true },
+        growBall:    { label: "B",   emoji: "💪",  color: "#9b5de5", text: "Big ball!",      name: "Big ball",      description: "One life-long permanent slot; stacks with more B pills", kind: "life", ms: 0, good: true },
+        growPad:     { label: "GROW",emoji: "↔️",  color: "#43aa8b", text: "Big paddle!",    name: "Big paddle",    description: "One life-long permanent slot; stacks with more GROW pills", kind: "life", ms: 0, good: true },
+        shrinkPad:   { label: "SHRK",emoji: "🤏",  color: "#e76f51", text: "Tiny paddle!",   name: "Tiny paddle",   description: "One life-long permanent slot; stacks with more SHRK pills", kind: "life", ms: 0, good: false },
+        slowBall:    { label: "SLOW",emoji: "🐌",  color: "#ffd166", text: "Slow-mo!",       name: "Slow-mo",       description: "0.6x ball speed for 10s",            kind: "timed",    ms: 10000, good: true },
+        extraLife:   { label: "♥",   emoji: "❤️",  color: "#ff5b8b", text: "Extra life!",    name: "Extra life",    description: "+1 life instantly",                    kind: "instant",  ms: 0,     good: true },
+        sticky:      { label: "STKY",emoji: "🪝",  color: "#7d5a3c", text: "Sticky paddle!", name: "Sticky paddle", description: "Replaces your current permanent upgrade for this life", kind: "life", ms: 0, good: true },
+        pistol:      { label: "PEW", emoji: "🔫",  color: "#3da9fc", text: "Paddle pistol!", name: "Paddle pistol", description: "Replaces your current permanent upgrade for this life", kind: "life", ms: 0, good: true },
+        invinciball: { label: "INV", emoji: "✨",  color: "#56cfe1", text: "Invinciball!",   name: "Invinciball",   description: "Smash through bricks for 10s",        kind: "timed",    ms: 10000, good: true },
+        fastBall:    { label: "FAST",emoji: "⚡",  color: "#ff7f51", text: "Speed up!",      name: "Speed up",      description: "1.5x ball speed for 7s",             kind: "timed",    ms: 7000,  good: false }
     };
     const POWERUP_KEYS = Object.keys(POWERUPS);
     const POWERUP_ORDER = ["extraBall", "growBall", "growPad", "sticky", "pistol", "invinciball", "slowBall", "extraLife", "shrinkPad", "fastBall"];
@@ -51,10 +51,18 @@
     const SPEED_BUMP_PER_TICK = 1.0002;        // very slight passive ramp per frame
     const MAX_SPEED_MUL = 2.4;                 // cap
     const MOD_BAD_BIAS = 0.35;                 // ~35% of powerup drops are bad ones
+    const LEVEL_SPEED_GROWTH = 1.25;
+    const PADDLE_GROW_STEP = 0.6;
+    const PADDLE_SHRINK_STEP = 0.35;
+    const BALL_GROW_STEP = 0.5;
+    const MIN_PADDLE_SIZE_MUL = 0.35;
+    const MAX_PADDLE_SIZE_MUL = 3.4;
+    const MAX_BALL_SIZE_MUL = 2.5;
     const PISTOL_SHOT_SPEED = 10;
     const PISTOL_SHOT_W = 5;
     const PISTOL_SHOT_H = 16;
     const PISTOL_SHOT_COOLDOWN_MS = 240;
+    const STACKING_PERMANENT_TYPES = { growPad: true, shrinkPad: true, growBall: true };
 
     let canvas, ctx, rootEl;
     let onExit, onHighScore, getHighScore = () => 0;
@@ -112,7 +120,7 @@
                 </div>
                 <aside class="catanoid-panel">
                     <h3>Pill box</h3>
-                    <p class="catanoid-panel-copy">Catch a pill to trigger its effect. Timed pills of the same type stack their duration, so two PEW pills last twice as long.</p>
+                    <p class="catanoid-panel-copy">Catch a pill to trigger its effect. One-shot pills fire immediately, timed pills stack their duration, and you can hold only one permanent pill type at a time until you lose a life.</p>
                     <div class="catanoid-legend">
                         ${renderPowerupLegend()}
                     </div>
@@ -125,7 +133,7 @@
                     <button type="button" data-act="right">→</button>
                 </div>
             </div>
-            <p class="break-help">Don't drop the ball! Each new level launches at 1.5x the previous level's speed, brick points still double with each level, and stacked pills extend matching timers.</p>
+            <p class="break-help">Don't drop the ball! Each new level launches at 1.25x the previous level's speed, brick points still double with each level, timed pills extend matching timers, only one permanent upgrade type can be active at once, and stackable permanents only stack with matching pills.</p>
         `;
         canvas = document.getElementById("catanoid-canvas");
         ctx = canvas.getContext("2d");
@@ -175,6 +183,7 @@
             shots: [],
             powerups: [],
             mods: { paddleSizeMul: 1, ballSizeMul: 1, ballSpeedMul: 1, sticky: false, pistol: false, invinciball: false },
+            persistentMods: { type: "", stacks: 0 },
             modExpiry: {},  // key -> timestamp ms
             popups: [],     // floating text after collecting a powerup
             bricks: spawnBricks(),
@@ -210,7 +219,7 @@
 
     function levelStartSpeed(level) {
         const safeLevel = Math.max(1, level || (state && state.level) || 1);
-        return BASE_BALL_SPEED * Math.pow(1.5, safeLevel - 1);
+        return BASE_BALL_SPEED * Math.pow(LEVEL_SPEED_GROWTH, safeLevel - 1);
     }
 
     function brickPoints(row, level) {
@@ -237,6 +246,83 @@
         if (!state.modExpiry[key]) return;
         deactivateMod(key);
         delete state.modExpiry[key];
+    }
+
+    function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function releaseStickyBalls() {
+        for (const b of state.balls) {
+            if (b.onPaddle && b.vx === 0 && b.vy === 0) {
+                const angle = (Math.random() * 0.4 - 0.2) - Math.PI / 2;
+                const speed = currentBallSpeed();
+                b.vx = Math.cos(angle) * speed;
+                b.vy = Math.sin(angle) * speed;
+                b.onPaddle = false;
+            }
+        }
+    }
+
+    function applyPersistentMods() {
+        const previousSticky = !!state.mods.sticky;
+        const previousPistol = !!state.mods.pistol;
+        const persistent = state.persistentMods || { type: "", stacks: 0 };
+        const type = persistent.type || "";
+        const stacks = Math.max(0, persistent.stacks || 0);
+        let paddleSizeMul = 1;
+        let ballSizeMul = 1;
+        let sticky = false;
+        let pistol = false;
+        if (type === "growPad") {
+            paddleSizeMul = clamp(1 + stacks * PADDLE_GROW_STEP, MIN_PADDLE_SIZE_MUL, MAX_PADDLE_SIZE_MUL);
+        } else if (type === "shrinkPad") {
+            paddleSizeMul = clamp(1 - stacks * PADDLE_SHRINK_STEP, MIN_PADDLE_SIZE_MUL, MAX_PADDLE_SIZE_MUL);
+        } else if (type === "growBall") {
+            ballSizeMul = clamp(1 + stacks * BALL_GROW_STEP, 1, MAX_BALL_SIZE_MUL);
+        } else if (type === "sticky") {
+            sticky = stacks > 0;
+        } else if (type === "pistol") {
+            pistol = stacks > 0;
+        }
+        state.mods.paddleSizeMul = paddleSizeMul;
+        state.mods.ballSizeMul = ballSizeMul;
+        state.mods.sticky = sticky;
+        state.mods.pistol = pistol;
+        if (previousSticky && !sticky) releaseStickyBalls();
+        if (previousPistol && !pistol) state.shots = [];
+        if (state.paddle) {
+            const maxX = W - paddleWidth() - FIELD_PADX;
+            state.paddle.x = clamp(state.paddle.x, FIELD_PADX, maxX);
+        }
+    }
+
+    function resetPersistentMods() {
+        state.persistentMods = { type: "", stacks: 0 };
+        applyPersistentMods();
+    }
+
+    function applyPermanentPowerup(type) {
+        const current = state.persistentMods || { type: "", stacks: 0 };
+        if (current.type === type) {
+            if (STACKING_PERMANENT_TYPES[type]) {
+                current.stacks = Math.max(1, current.stacks || 1) + 1;
+            } else {
+                current.stacks = 1;
+            }
+        } else {
+            state.persistentMods = { type, stacks: 1 };
+        }
+        applyPersistentMods();
+    }
+
+    function activePermanentBadges() {
+        if (!state || !state.persistentMods) return [];
+        const type = state.persistentMods.type || "";
+        const stacks = Math.max(0, state.persistentMods.stacks || 0);
+        if (!type || stacks <= 0) return [];
+        const suffix = STACKING_PERMANENT_TYPES[type] ? ` x${stacks}` : " LIFE";
+        return [{ type, text: `${POWERUPS[type].label}${suffix}` }];
     }
 
     function destroyBrick(br, dropQueue) {
@@ -456,20 +542,8 @@
             state.lives--;
             if (state.lives <= 0) { endGame(); return; }
             state.balls = [makeStartingBall()];
-            // Reset most modifiers on death (keeps the game manageable)
-            state.mods.ballSizeMul = 1;
-            state.mods.ballSpeedMul = 1;
-            state.mods.sticky = false;
-            state.mods.pistol = false;
-            state.mods.invinciball = false;
             state.shots = [];
-            // Keep paddle size as-is; reset modExpiry for ball ones
-            delete state.modExpiry.growBall;
-            delete state.modExpiry.slowBall;
-            delete state.modExpiry.fastBall;
-            delete state.modExpiry.sticky;
-            delete state.modExpiry.pistol;
-            delete state.modExpiry.invinciball;
+            resetPersistentMods();
         }
 
         // ---- Floating popups ----
@@ -477,7 +551,7 @@
         state.popups = state.popups.filter(p => p.t > 0);
 
         // ---- Level cleared ----
-        if (state.bricks.every(b => !b.alive)) {
+        if (state.bricks.every(b => !b.alive) && state.powerups.length === 0) {
             state.level++;
             state.bricks = spawnBricks();
             state.balls = [makeStartingBall()];
@@ -527,26 +601,8 @@
             return;
         }
         if (type === "extraLife") { state.lives++; return; }
-        if (type === "growBall") {
-            if (!isTimedModActive(type, now)) state.mods.ballSizeMul = 1.8;
-            extendTimedMod(type, cfg.ms, now);
-            return;
-        }
-        if (type === "growPad")  {
-            clearTimedMod("shrinkPad");
-            if (!isTimedModActive(type, now)) state.mods.paddleSizeMul = 1.6;
-            extendTimedMod(type, cfg.ms, now);
-            return;
-        }
-        if (type === "shrinkPad") {
-            clearTimedMod("growPad");
-            if (!isTimedModActive(type, now)) state.mods.paddleSizeMul = 0.65;
-            extendTimedMod(type, cfg.ms, now);
-            return;
-        }
-        if (type === "pistol") {
-            if (!isTimedModActive(type, now)) state.mods.pistol = true;
-            extendTimedMod(type, cfg.ms, now);
+        if (cfg.kind === "life") {
+            applyPermanentPowerup(type);
             return;
         }
         if (type === "invinciball") {
@@ -572,19 +628,10 @@
             extendTimedMod(type, cfg.ms, now);
             return;
         }
-        if (type === "sticky") {
-            if (!isTimedModActive(type, now)) state.mods.sticky = true;
-            extendTimedMod(type, cfg.ms, now);
-            return;
-        }
     }
 
     function deactivateMod(key) {
-        if (key === "growBall") {
-            state.mods.ballSizeMul = 1;
-        } else if (key === "growPad" || key === "shrinkPad") {
-            state.mods.paddleSizeMul = 1;
-        } else if (key === "slowBall") {
+        if (key === "slowBall") {
             // Restore base speed multiplier and re-scale live ball velocities
             const inv = 1 / 0.6;
             state.mods.ballSpeedMul = 1;
@@ -593,24 +640,6 @@
             const inv = 1 / 1.5;
             state.mods.ballSpeedMul = 1;
             for (const b of state.balls) { b.vx *= inv; b.vy *= inv; }
-        } else if (key === "sticky") {
-            state.mods.sticky = false;
-            // Release any stuck balls
-            for (const b of state.balls) {
-                if (b.onPaddle && (b.vx !== 0 || b.vy !== 0 || true)) {
-                    // Auto-launch any stuck ball when sticky expires
-                    if (b.vx === 0 && b.vy === 0) {
-                        const angle = (Math.random() * 0.4 - 0.2) - Math.PI / 2;
-                        const speed = currentBallSpeed();
-                        b.vx = Math.cos(angle) * speed;
-                        b.vy = Math.sin(angle) * speed;
-                        b.onPaddle = false;
-                    }
-                }
-            }
-        } else if (key === "pistol") {
-            state.mods.pistol = false;
-            state.shots = [];
         } else if (key === "invinciball") {
             state.mods.invinciball = false;
         }
@@ -841,6 +870,22 @@
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(txt, badgeX - tw / 2, 25);
+            badgeX -= tw + 6;
+        }
+
+        badgeX = W - 16;
+        for (const badge of activePermanentBadges()) {
+            const cfg = POWERUPS[badge.type];
+            if (!cfg) continue;
+            ctx.font = "bold 11px sans-serif";
+            const tw = ctx.measureText(badge.text).width + 12;
+            ctx.fillStyle = cfg.color;
+            roundRect(ctx, badgeX - tw, 40, tw, 18, 9);
+            ctx.fill();
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(badge.text, badgeX - tw / 2, 49);
             badgeX -= tw + 6;
         }
 

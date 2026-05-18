@@ -48,7 +48,7 @@
     const HEAT_STALL_MS = 2600;
     const COOL_ARROW_RESTORE = 58;
     const CRASH_MS = 1750;
-    const PILEUP_INVINCIBLE_MS = 5000;
+    const PILEUP_INVINCIBLE_MS = 2000;
     const LANE_SHIFT_PER_SEC = 7.5;
     const AIR_PITCH_RATE = 2.6;
     const PITCH_SAFE_MIN = -0.5;
@@ -1799,31 +1799,31 @@
                 obstacle("bump", 1490, 32, { lane: 4, power: 0.44 })
             ],
             "track-2": [
-                humpSet(240, 4, { lanes: [2, 4] }),
+                humpSet(220, 4, { lanes: [2, 4] }),
                 obstacle("bump", 360, 28, { lane: 4, power: 0.42 }),
                 obstacle("mud", 940, 70, { lane: 4, drag: 28 }),
                 humpSet(1420, 1, { lanes: [0, 1] }),
                 obstacle("cool", 1650, 34, { lane: 4 })
             ],
             "track-3": [
-                humpSet(280, 5, { lanes: [1, 3] }),
+                humpSet(120, 5, { lanes: [1, 3] }),
                 obstacle("cool", 520, 34, { lane: 4 }),
                 obstacle("ramp", 1320, 48, { lane: 4, power: 0.82 }),
-                humpSet(1680, 2, { lanes: [0, 2, 4] }),
+                humpSet(1730, 2, { lanes: [0, 2, 4] }),
                 obstacle("mud", 1760, 76, { lane: 4, drag: 36 })
             ],
             "track-4": [
-                humpSet(220, 3, { lanes: [0, 4] }),
+                humpSet(280, 3, { lanes: [0, 4] }),
                 obstacle("bump", 420, 30, { lane: 4, power: 0.48 }),
                 obstacle("cool", 1080, 34, { lane: 4 }),
-                humpSet(1820, 4, { lanes: [1, 2] }),
+                humpSet(1772, 4, { lanes: [1, 2] }),
                 obstacle("tight", 2460, 86, { openLanes: [1, 3, 4] })
             ],
             "track-5": [
                 humpSet(300, 2, { lanes: [0, 2] }),
                 obstacle("ramp", 520, 54, { lane: 4, power: 1.02 }),
                 obstacle("mud", 1210, 82, { lane: 4, drag: 40 }),
-                humpSet(1880, 5, { lanes: [1, 3] }),
+                humpSet(1896, 4, { lanes: [1, 3] }),
                 obstacle("tight", 2300, 96, { openLanes: [1, 4] }),
                 obstacle("cool", 2870, 34, { lane: 4 })
             ]
@@ -1837,7 +1837,7 @@
 
     function humpSet(start, count, opts) {
         const items = [];
-        const gap = 22;
+        const gap = 36;
         for (let i = 0; i < count; i++) {
             items.push(obstacle("hump", start + i * gap, 30, opts));
         }

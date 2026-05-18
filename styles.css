@@ -3355,6 +3355,21 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     gap: 0.45rem;
 }
 
+.meowterbike-class-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.meowterbike-class-board {
+    display: grid;
+    gap: 0.65rem;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 0.9rem;
+}
+
 .danger-noodle-chip,
 .cat-man-chip,
 .meowterbike-chip {
@@ -3612,6 +3627,10 @@ textarea[readonly] { background: var(--surface-soft); cursor: default; opacity: 
     margin-top: 0.25rem;
     background: #c49a6c;
     box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+.meowterbike-legend-item.is-hump .meowterbike-swatch {
+    background: #b88d62;
 }
 
 .meowterbike-legend-item.is-ramp .meowterbike-swatch {

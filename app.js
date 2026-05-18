@@ -237,7 +237,12 @@
                 catanoidHighScore: 0,
                 dangerNoodleHighScore: 0,
                 catManHighScore: 0,
-                meowterbikeBestTimeMs: null
+                meowterbikeBestTimeMs: null,
+                meowterbikeBestTimes: {
+                    "50cc": null,
+                    "100cc": null,
+                    "150cc": null
+                }
             }
         };
     }
@@ -277,11 +282,57 @@
         for (const k of Object.keys(def.breaks)) {
             if (s.breaks[k] === undefined) s.breaks[k] = def.breaks[k];
         }
+        if (!s.breaks.meowterbikeBestTimes || typeof s.breaks.meowterbikeBestTimes !== "object") {
+            s.breaks.meowterbikeBestTimes = Object.assign({}, def.breaks.meowterbikeBestTimes);
+        }
+        for (const classId of Object.keys(def.breaks.meowterbikeBestTimes)) {
+            if (s.breaks.meowterbikeBestTimes[classId] === undefined) s.breaks.meowterbikeBestTimes[classId] = def.breaks.meowterbikeBestTimes[classId];
+        }
+        if (typeof s.breaks.meowterbikeBestTimeMs === "number" && s.breaks.meowterbikeBestTimeMs > 0 && !s.breaks.meowterbikeBestTimes["50cc"]) {
+            s.breaks.meowterbikeBestTimes["50cc"] = s.breaks.meowterbikeBestTimeMs;
+        }
         if (!s.stats) s.stats = def.stats;
         return s;
     }
 
     const BREAK_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between breaks
+    const DEV_BREAK_RULES_FEATURE = "break-rules-bypass";
+    const DEV_MODE_ENABLED = readDevModeFlag();
+    let devBreakBypassActive = false;
+
+    function readDevModeFlag() {
+        try {
+            return new URLSearchParams(window.location.search).get("devmode") === "true";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function hasDevFeature(feature) {
+        return DEV_MODE_ENABLED && feature === DEV_BREAK_RULES_FEATURE;
+    }
+
+    function isBreakRulesBypassed() {
+        return hasDevFeature(DEV_BREAK_RULES_FEATURE) && devBreakBypassActive;
+    }
+
+    function enableBreakRulesBypass() {
+        devBreakBypassActive = true;
+        if (window.BreakSession && window.BreakSession.isActive()) window.BreakSession.end();
+    }
+
+    function clearBreakRulesBypass() {
+        devBreakBypassActive = false;
+    }
+
+    window.DevMode = {
+        isEnabled() {
+            return DEV_MODE_ENABLED;
+        },
+        hasFeature(feature) {
+            return hasDevFeature(feature);
+        }
+    };
 
     function breakCooldownRemaining() {
         const last = state.breaks && state.breaks.lastBreakStartISO;
@@ -298,6 +349,7 @@
 
     function startBreakSession() {
         if (window.BreakSession.isActive()) return;
+        clearBreakRulesBypass();
         recordBreakStart();
         window.BreakSession.start();
     }
@@ -1077,6 +1129,7 @@
         if (window.Meowterbike && window.Meowterbike.stop) window.Meowterbike.stop();
         // If leaving the break section entirely, end the shared session.
         if (!goingToBreak && window.BreakSession) window.BreakSession.end();
+        if (!goingToBreak) clearBreakRulesBypass();
         if (!goingToBreak && window._breakLockoutTimer) {
             clearTimeout(window._breakLockoutTimer);
             window._breakLockoutTimer = null;
@@ -3742,11 +3795,11 @@
             icon: "🏍️",
             blurb: "Rip through cat-cross tracks, dodge rivals, and manage turbo heat.",
             color: "#f4a261",
-            highKey: "meowterbikeBestTimeMs",
+            highKey: "meowterbikeBestTimes",
             bestMode: "min",
             bestLabel: "🏁 Tour best",
             emptyBest: "--:--.---",
-            formatBest: value => formatRaceTime(value),
+            formatBest: value => formatMeowterbikeBestTimes(value),
             newBestMessage: "New best tour time! 🏁"
         }
     ];
@@ -3755,7 +3808,13 @@
         const game = BREAK_GAMES.find(g => g.id === gameId);
         if (!game) return 0;
         if (!state.breaks) return game.bestMode === "min" ? null : 0;
+        if (gameId === "meowterbike") return state.breaks.meowterbikeBestTimes || defaultState().breaks.meowterbikeBestTimes;
         return state.breaks[game.highKey];
+    }
+
+    function highScoreForMeowterbikeClass(classId) {
+        const all = highScoreFor("meowterbike") || {};
+        return all[classId] || null;
     }
 
     function formatRaceTime(ms) {
@@ -3766,15 +3825,42 @@
         return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
     }
 
+    function formatMeowterbikeBestTimes(value) {
+        const all = value || {};
+        return ["50cc", "100cc", "150cc"].map(classId => `${classId}: ${formatRaceTime(all[classId])}`).join(" · ");
+    }
+
     function formatBreakBest(game, value) {
         if (!game) return "0";
         if (typeof game.formatBest === "function") return game.formatBest(value);
         return typeof value === "number" ? String(value) : "0";
     }
 
+    function setMeowterbikeHighScore(classId, score) {
+        state.breaks = state.breaks || {};
+        if (!state.breaks.meowterbikeBestTimes || typeof state.breaks.meowterbikeBestTimes !== "object") {
+            state.breaks.meowterbikeBestTimes = defaultState().breaks.meowterbikeBestTimes;
+        }
+        const previous = state.breaks.meowterbikeBestTimes[classId];
+        const isBetter = typeof score === "number" && score > 0 && (typeof previous !== "number" || previous <= 0 || score < previous);
+        if (!isBetter) return;
+        state.breaks.meowterbikeBestTimes[classId] = score;
+        if (classId === "50cc") state.breaks.meowterbikeBestTimeMs = score;
+        saveState();
+        mascotPopIn({
+            expression: "cheering",
+            message: `New ${classId} tour best! 🏁`,
+            duration: 3000, side: "right"
+        });
+    }
+
     function setHighScoreFor(gameId, score) {
         const game = BREAK_GAMES.find(g => g.id === gameId);
         if (!game) return;
+        if (gameId === "meowterbike") {
+            setMeowterbikeHighScore("50cc", score);
+            return;
+        }
         state.breaks = state.breaks || {};
         const previous = state.breaks[game.highKey];
         const isBetter = game.bestMode === "min"
@@ -3794,11 +3880,12 @@
     function renderBreakHub(root) {
         // Cooldown still applies to entering the break section
         const remaining = breakCooldownRemaining();
-        if (remaining > 0 && !window.BreakSession.isActive()) {
+        if (remaining > 0 && !window.BreakSession.isActive() && !isBreakRulesBypassed()) {
             renderBreakLockout(root, remaining);
             return;
         }
         const breakIsActive = window.BreakSession.isActive();
+        const breakBypassActive = isBreakRulesBypassed();
         const cards = BREAK_GAMES.map(g => `
             <a class="break-game-card" href="#/break/${g.id}" style="--accent:${g.color}">
                 <div class="break-game-icon">${g.icon}</div>
@@ -3817,9 +3904,10 @@
                 <div>
                     <h1>☕ Take a break</h1>
                     <p>Pick a game. We'll ask before starting the 5-minute shared break timer, then you can switch freely whenever you like.</p>
+                    ${hasDevFeature(DEV_BREAK_RULES_FEATURE) ? `<p class="break-meta">${breakBypassActive ? "Dev mode: break rules are currently bypassed." : "Dev mode: break rules can be bypassed from the game start screen."}</p>` : ""}
                 </div>
                 <div class="tetris-timer-wrap">
-                    <div class="tetris-timer-label" id="break-hub-label">${breakIsActive ? "Time left" : "Starts when you say yes"}</div>
+                    <div class="tetris-timer-label" id="break-hub-label">${breakIsActive ? "Time left" : (breakBypassActive ? "Dev bypass active" : "Starts when you say yes")}</div>
                     <div class="tetris-timer" id="break-hub-timer">5:00</div>
                 </div>
             </header>
@@ -3837,7 +3925,7 @@
             if (!window.BreakSession.isActive()) {
                 elem.textContent = "5:00";
                 elem.classList.remove("overtime");
-                if (label) label.textContent = "Starts when you say yes";
+                if (label) label.textContent = isBreakRulesBypassed() ? "Dev bypass active" : "Starts when you say yes";
                 return;
             }
             const r = window.BreakSession.BREAK_MS - window.BreakSession.elapsed();
@@ -3865,7 +3953,7 @@
     function renderBreakGame(root, gameId) {
         // Cooldown enforcement (only when arriving fresh — if a session is
         // already active, we're switching games and should let through).
-        if (!window.BreakSession.isActive()) {
+        if (!window.BreakSession.isActive() && !isBreakRulesBypassed()) {
             const remaining = breakCooldownRemaining();
             if (remaining > 0) {
                 renderBreakLockout(root, remaining);
@@ -3881,6 +3969,11 @@
             getHighScore: () => highScoreFor(gameId),
             onHighScore: (score) => setHighScoreFor(gameId, score)
         };
+        if (gameId === "meowterbike") {
+            opts.getHighScore = (classId) => highScoreForMeowterbikeClass(classId || "50cc");
+            opts.getLeaderboards = () => highScoreFor("meowterbike");
+            opts.onHighScore = (score, classId) => setMeowterbikeHighScore(classId || "50cc", score);
+        }
         if (gameId === "catris") return window.CatTetris.start(root, opts);
         if (gameId === "invaders") return window.CatInvaders.start(root, opts);
         if (gameId === "catanoid") return window.Catanoid.start(root, opts);
@@ -3904,8 +3997,10 @@
                     <div class="break-countdown-sub">shared across every break game</div>
                 </div>
                 <p class="break-meta">Once it starts, you can swap to another break game any time and keep the same timer running.</p>
+                ${hasDevFeature(DEV_BREAK_RULES_FEATURE) ? `<p class="break-meta">Dev mode is on, so you can also bypass the break rules and jump straight into the game without starting the timer.</p>` : ""}
                 <div class="break-lockout-actions">
                     <button type="button" class="primary-btn" id="break-start-confirm">▶ Start break and play ${escapeHtml(game.name)}</button>
+                    ${hasDevFeature(DEV_BREAK_RULES_FEATURE) ? `<button type="button" class="ghost-btn" id="break-start-bypass">Ignore</button>` : ""}
                     <a class="ghost-btn" href="#/break">Not yet</a>
                 </div>
             </section>
@@ -3913,6 +4008,11 @@
 
         document.getElementById("break-start-confirm").addEventListener("click", () => {
             startBreakSession();
+            render();
+        });
+        const bypass = document.getElementById("break-start-bypass");
+        if (bypass) bypass.addEventListener("click", () => {
+            enableBreakRulesBypass();
             render();
         });
     }
@@ -3937,9 +4037,15 @@
                 <div class="break-lockout-actions">
                     <a class="primary-btn" href="#/">Pick a quiz</a>
                     <a class="ghost-btn" href="#/clan">🐾 Visit my pets instead</a>
+                    ${hasDevFeature(DEV_BREAK_RULES_FEATURE) ? `<button type="button" class="ghost-btn" id="break-lockout-bypass">Ignore</button>` : ""}
                 </div>
             </section>
         `;
+        const bypass = document.getElementById("break-lockout-bypass");
+        if (bypass) bypass.addEventListener("click", () => {
+            enableBreakRulesBypass();
+            render();
+        });
         // Live countdown
         const tick = () => {
             const r = breakCooldownRemaining();
@@ -4776,6 +4882,9 @@
         const sparklePotions = sparklePotionCount();
         const savedBreakBestCount = BREAK_GAMES.filter(game => {
             const value = state.breaks && state.breaks[game.highKey];
+            if (game.id === "meowterbike" && value && typeof value === "object") {
+                return Object.keys(value).some(key => typeof value[key] === "number" && value[key] > 0);
+            }
             return typeof value === "number" && value > 0;
         }).length;
         const sessions = STATE_SUBJECTS.reduce((n, id) => n + (state.subjects[id].quizSessions || []).length, 0);

@@ -1169,6 +1169,7 @@
         if (route[0] === "subject" && route[1]) {
             const subjectId = route[1];
             if (route[2] === "guide" && route[3]) return renderLearningGuide(root, subjectId, route[3]);
+            if (route[2] === "cheat-sheet" && route[3]) return renderMathsCheatSheet(root, subjectId, route[3]);
             if (route[2] === "quiz" && route[3]) return renderQuiz(root, subjectId, route[3], route[4] || null);
             return renderSubject(root, subjectId);
         }
@@ -1495,6 +1496,8 @@
 
             ${renderMockExamsSection(subjectId, subj)}
 
+            ${isMaths ? renderMathsCheatSheetSection(subjectId) : ""}
+
             ${isMaths ? `
             <aside class="maths-tip">
                 <strong>💡 Need a hand?</strong>
@@ -1506,6 +1509,87 @@
             const calcBtn = document.getElementById("calc-launch-subject");
             if (calcBtn) calcBtn.addEventListener("click", () => window.Calc && window.Calc.open());
         }
+    }
+
+    function mathsCheatSheetSubjects(currentSubjectId) {
+        const ids = ["maths", "maths-core"].filter(id => {
+            const subj = window.SUBJECT_DATA[id];
+            return subj && subj.cheatSheet;
+        });
+        ids.sort((a, b) => {
+            if (a === currentSubjectId) return -1;
+            if (b === currentSubjectId) return 1;
+            return 0;
+        });
+        return ids;
+    }
+
+    function renderMathsCheatSheetSection(subjectId) {
+        const sheetIds = mathsCheatSheetSubjects(subjectId);
+        if (!sheetIds.length) return "";
+        const cards = sheetIds.map(sheetId => {
+            const sheetSubj = window.SUBJECT_DATA[sheetId];
+            const sheet = sheetSubj.cheatSheet;
+            return `
+                <a class="mock-card" href="#/subject/${subjectId}/cheat-sheet/${sheetId}">
+                    <div class="mock-badge">📄 Sample A4 sheet</div>
+                    <h4>${escapeHtml(sheet.title || `${sheetSubj.name} Cheat Sheet`)}</h4>
+                    <p class="mock-focus">${escapeHtml(sheet.subtitle || sheetSubj.tagline || "")}</p>
+                    <div class="mock-composition">
+                        <span>${(sheet.sections || []).length} sections</span>
+                        <span>Formulas · concepts · reminders</span>
+                    </div>
+                </a>
+            `;
+        }).join("");
+        return `
+            <section class="mocks-section">
+                <h2>📄 Cheat Sheets <span class="section-tag">${sheetIds.length} sample A4 pages</span></h2>
+                <p class="section-blurb">Open a dense, exam-focused sample cheat sheet with formulas, concepts, and reminders based on the half-yearly scope. Use it as a study organiser, not as a replacement for working practice.</p>
+                <div class="mock-grid">${cards}</div>
+            </section>
+        `;
+    }
+
+    function renderMathsCheatSheet(root, subjectId, sheetId) {
+        if (!isSelectedLiveSubject(subjectId) || !isMathsSubject(subjectId)) { navigate("/"); return; }
+        const subject = window.SUBJECT_DATA[subjectId];
+        const sheetSubject = window.SUBJECT_DATA[sheetId];
+        const sheet = sheetSubject && sheetSubject.cheatSheet;
+        if (!subject || !sheetSubject || !sheet || !isMathsSubject(sheetId)) {
+            navigate(`/subject/${subjectId}`);
+            return;
+        }
+        const sections = (sheet.sections || []).map(section => `
+            <section class="guide-section">
+                <h3>${escapeHtml(section.heading || "")}</h3>
+                ${section.body ? `<p>${renderText(section.body)}</p>` : ""}
+                ${Array.isArray(section.points) && section.points.length ? `<ul>${section.points.map(point => `<li>${renderText(point)}</li>`).join("")}</ul>` : ""}
+            </section>
+        `).join("");
+
+        root.innerHTML = `
+            <a class="back-link" href="#/subject/${subjectId}">← Back to ${escapeHtml(subject.name)}</a>
+            <section class="guide-page cheat-sheet-page" style="--accent:${sheetSubject.color}">
+                <header class="guide-header">
+                    <div>
+                        <p class="overline">${escapeHtml(sheet.subtitle || sheetSubject.tagline || "")}</p>
+                        <h1>${sheetSubject.icon} ${escapeHtml(sheet.title || `${sheetSubject.name} Cheat Sheet`)}</h1>
+                        <p class="guide-summary">${renderText(sheet.intro || "")}</p>
+                    </div>
+                    <div class="guide-topic-chip">Sample A4 sheet</div>
+                </header>
+                <section class="guide-section cheat-sheet-note">
+                    <h3>What to squeeze onto the page</h3>
+                    <p>${renderText(sheet.note || "")}</p>
+                </section>
+                <div class="cheat-sheet-paper">
+                    <div class="cheat-sheet-grid">
+                        ${sections}
+                    </div>
+                </div>
+            </section>
+        `;
     }
 
     function renderMockExamsSection(subjectId, subj) {

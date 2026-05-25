@@ -33,6 +33,87 @@ window.SUBJECT_DATA["maths-core"] = {
         { id: "fdp-conversions", name: "Fractions, decimals & percentages" },
         { id: "fdp-operations", name: "Operating with fractions, decimals & percentages" }
     ],
+    cheatSheet: {
+        title: "Maths Core Cheat Sheet",
+        subtitle: "Year 7 Half Yearly — Papers 1 & 2",
+        intro: "A sample one-page A4 cheat sheet for the Year 7 half-yearly. Pack the page with rules, mini-conversions, and angle facts so you can scan it quickly while revising.",
+        note: "Keep this to one A4 page. Use short rules, tiny worked examples, and common conversions. In the real exam, read carefully, label diagrams, and always write the unit or symbol the question asks for.",
+        sections: [
+            {
+                heading: "Integers, ordering and place value",
+                points: [
+                    "On a number line, numbers further left are smaller.",
+                    "Negative numbers with larger absolute value are smaller: -12 < -5.",
+                    "Opposites are the same distance from 0 with opposite signs: opposite of -9 is 9.",
+                    "Absolute value means distance from 0: |-7| = 7.",
+                    "Place value chart: ten-thousands | thousands | hundreds | tens | ones.",
+                    "Zero is a place holder, so 5,040 means 5 thousands, 0 hundreds, 4 tens, 0 ones."
+                ]
+            },
+            {
+                heading: "Integer operations and order of operations",
+                points: [
+                    "BODMAS/BIDMAS: brackets, orders, divide/multiply, add/subtract.",
+                    "Add same signs: add and keep the sign. Example: -4 + -3 = -7.",
+                    "Add different signs: subtract and keep the sign of the larger absolute value.",
+                    "Subtracting a negative turns into addition: 6 - (-2) = 8.",
+                    "For multiplication/division: + with + gives +, + with - gives -, - with - gives +."
+                ]
+            },
+            {
+                heading: "Angle facts to remember",
+                points: [
+                    "Angles on a straight line add to 180°.",
+                    "Angles around a point add to 360°.",
+                    "Vertically opposite angles are equal.",
+                    "Complementary angles add to 90°.",
+                    "Supplementary angles add to 180°.",
+                    "If algebra is used, turn the angle fact into an equation first, then solve."
+                ]
+            },
+            {
+                heading: "Parallel lines and transversals",
+                points: [
+                    "Corresponding angles are equal.",
+                    "Alternate angles are equal.",
+                    "Co-interior angles add to 180°.",
+                    "Look for a Z, F, or C pattern before solving.",
+                    "Write the reason beside the step: corresponding, alternate, co-interior, straight line, around a point."
+                ]
+            },
+            {
+                heading: "Fractions, decimals and percentages",
+                points: [
+                    "Fraction -> decimal: numerator ÷ denominator.",
+                    "Decimal -> percent: multiply by 100%.",
+                    "Percent -> decimal: divide by 100.",
+                    "Percent of an amount = decimal form x amount.",
+                    "Common conversions: 1/2 = 0.5 = 50%, 1/4 = 0.25 = 25%, 3/4 = 0.75 = 75%, 1/5 = 0.2 = 20%, 1/10 = 0.1 = 10%."
+                ]
+            },
+            {
+                heading: "Operating with fractions, decimals and percentages",
+                points: [
+                    "Add/subtract decimals by lining up decimal points.",
+                    "Multiply decimals normally, then place the decimal at the end.",
+                    "To divide by a decimal, scale both numbers so the divisor becomes whole.",
+                    "Add/subtract fractions using a common denominator.",
+                    "Multiply fractions: top x top, bottom x bottom.",
+                    "Divide fractions: keep, change, flip.",
+                    "Simplify final answers fully."
+                ]
+            },
+            {
+                heading: "Final reminders",
+                points: [
+                    "Estimate first so you notice impossible answers.",
+                    "If the question asks for degrees, include the degree symbol.",
+                    "If the answer is a fraction, leave it in simplest form unless told otherwise.",
+                    "Check whether the question wants an exact answer, a decimal, or a percentage."
+                ]
+            }
+        ]
+    },
 
     mcqs: [
         /* ----- Integers, ordering & place value ----- */

@@ -38,6 +38,94 @@ window.SUBJECT_DATA.maths = {
         { id: "trig-elev",         name: "Elevation & depression" },
         { id: "trig-bearings",     name: "Bearings" }
     ],
+    cheatSheet: {
+        title: "Mathematics Cheat Sheet",
+        subtitle: "Year 9 Pathway to Advanced — Papers 3 & 4",
+        intro: "A sample one-page A4 cheat sheet for the Year 9 half-yearly. Make it dense: formulas, trigger words, and tiny reminders that help you choose the right method fast.",
+        note: "Keep it to one A4 page. Use symbolic rules, not long sentences. Include only the formulas and reminders you still mix up. In the exam, keep exact forms for surds when required and round only at the final step unless told otherwise.",
+        sections: [
+            {
+                heading: "Indices and surds",
+                points: [
+                    "a^m x a^n = a^(m+n)",
+                    "a^m / a^n = a^(m-n)",
+                    "(a^m)^n = a^(mn)",
+                    "(ab)^n = a^n b^n",
+                    "a^0 = 1 for a != 0",
+                    "a^(-n) = 1 / a^n",
+                    "a^(1/2) = sqrt(a), a^(m/n) = nth root of (a^m)",
+                    "sqrt(a) x sqrt(b) = sqrt(ab), sqrt(a) / sqrt(b) = sqrt(a/b)",
+                    "Simplify surds by pulling out square factors: sqrt(72) = 6sqrt(2)."
+                ]
+            },
+            {
+                heading: "Scientific notation and significant figures",
+                points: [
+                    "Scientific notation: a x 10^n where 1 <= a < 10.",
+                    "Move the decimal left -> positive power. Move it right -> negative power.",
+                    "Multiply in scientific notation: multiply coefficients, add powers.",
+                    "Divide in scientific notation: divide coefficients, subtract powers.",
+                    "Significant figures start at the first non-zero digit.",
+                    "Round only after rewriting the full number or final scientific form."
+                ]
+            },
+            {
+                heading: "Algebra, fractions and equations",
+                points: [
+                    "Expand brackets: a(b + c) = ab + ac.",
+                    "Difference of two brackets: (x + a)(x + b) = x^2 + (a + b)x + ab.",
+                    "Algebraic fractions: factor first, then cancel common factors only.",
+                    "Solve equations by doing the same thing to both sides.",
+                    "Clear fraction equations by multiplying every term by the LCD.",
+                    "For inequalities, reverse the sign only when multiplying or dividing by a negative."
+                ]
+            },
+            {
+                heading: "Quadratics and simultaneous equations",
+                points: [
+                    "Monic quadratics: find two numbers that multiply to c and add to b.",
+                    "Non-monic quadratics: split the middle term or use a grouping method.",
+                    "Quadratic formula: x = (-b +/- sqrt(b^2 - 4ac)) / 2a.",
+                    "Discriminant: b^2 - 4ac tells you the number of real solutions.",
+                    "Simultaneous equations: use substitution when one variable is isolated; use elimination when coefficients can be matched quickly."
+                ]
+            },
+            {
+                heading: "Coordinate geometry",
+                points: [
+                    "Gradient: m = (y2 - y1) / (x2 - x1)",
+                    "Midpoint: ((x1 + x2) / 2, (y1 + y2) / 2)",
+                    "Distance: d = sqrt((x2 - x1)^2 + (y2 - y1)^2)",
+                    "Line form: y = mx + c",
+                    "Point-gradient form: y - y1 = m(x - x1)",
+                    "Parallel lines have equal gradients.",
+                    "Perpendicular lines satisfy m1 x m2 = -1."
+                ]
+            },
+            {
+                heading: "Trigonometry and right triangles",
+                points: [
+                    "SOH: sin(theta) = opposite / hypotenuse",
+                    "CAH: cos(theta) = adjacent / hypotenuse",
+                    "TOA: tan(theta) = opposite / adjacent",
+                    "To find a side, choose the ratio with the side you want and the sides you know.",
+                    "To find an angle, use inverse trig: sin^(-1), cos^(-1), tan^(-1).",
+                    "Sketch the triangle, label the angle first, then decide opposite/adjacent."
+                ]
+            },
+            {
+                heading: "Bearings, elevation and exam reminders",
+                points: [
+                    "Bearings are measured clockwise from north and written with 3 digits.",
+                    "Angles of elevation and depression are measured from a horizontal line.",
+                    "Draw a fresh diagram whenever the wording is crowded.",
+                    "Check whether the answer should be exact form, decimal, coordinates, or an angle in degrees.",
+                    "Substitute carefully into formulas: brackets matter, especially with negatives.",
+                    "If the question says explain, include the rule you used, not just the answer."
+                ]
+            }
+        ]
+    },
     mcqs: [
         /* ----- Indices basic (MA5-IND-C-01) ----- */
         {
